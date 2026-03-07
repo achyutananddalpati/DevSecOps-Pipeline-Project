@@ -1,0 +1,7 @@
+AWS Target Server Information
+==============================
+Public IP: 13.205.25.48
+Public DNS: ec2-13-205-25-48.ap-south-1.compute.amazonaws.com
+Key File: devsecops-key.pem
+Username: ubuntu
+Region: ap-south-1 (Mumbai)
