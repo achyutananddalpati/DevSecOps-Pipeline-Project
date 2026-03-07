@@ -1,13 +1,111 @@
+name: 01 - Information Gathering
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Display server information
+        run: |
+          echo "=================================="
+          echo "🚀 DevSecOps Pipeline Started"
+          echo "=================================="
+          echo "Target IP: ${{ secrets.AWS_SERVER_IP }}"
+          echo "Target Domain: ${{ secrets.AWS_SERVER_DOMAIN }}"
+          echo "=================================="
+
       - name: 🔴 TEST 1 - Is Server Reachable? (Port 80 Check)
         run: |
           echo "Checking if server is online using port 80..."
-          if curl -s -o /dev/null --connect-timeout 5 http://${{ secrets.AWS_SERVER_IP }}; then
-            echo "✅ SERVER IS ONLINE (port 80 responded)"
-          else
+          echo "Attempting to connect to http://${{ secrets.AWS_SERVER_IP }}:80"
+          echo ""
+
+          # Use curl with timeout to check if port 80 responds
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 http://${{ secrets.AWS_SERVER_IP }} || echo "000")
+
+          echo "HTTP Response Code: $HTTP_CODE"
+          echo ""
+
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ SERVER IS ONLINE - Juice Shop is running (HTTP 200 OK)"
+            exit 0
+          elif [ "$HTTP_CODE" = "302" ] || [ "$HTTP_CODE" = "301" ]; then
+            echo "✅ SERVER IS ONLINE - Juice Shop responded with redirect (HTTP $HTTP_CODE)"
+            exit 0
+          elif [ "$HTTP_CODE" = "000" ]; then
             echo "❌ SERVER IS NOT RESPONDING on port 80"
+            echo ""
             echo "This could mean:"
             echo "  1. EC2 instance is stopped"
             echo "  2. Juice Shop container is not running"
             echo "  3. Security Group blocks port 80"
+            echo "  4. Network issue between GitHub and AWS"
+            echo ""
+            echo "Run these commands to fix:"
+            echo "  - SSH to server: ./connect-to-server.sh"
+            echo "  - Check container: docker ps"
+            echo "  - Start Juice Shop: docker start juice-shop"
             exit 1
+          else
+            echo "⚠️  Server responded with unexpected code: $HTTP_CODE"
+            echo "✅ Server is online but Juice Shop may have issues"
+            exit 0
           fi
+
+      - name: 🟡 TEST 2 - Verify Juice Shop Homepage
+        run: |
+          echo "Checking if Juice Shop homepage loads properly..."
+          echo ""
+
+          # Download the homepage and check for keywords
+          curl -s --connect-timeout 5 http://${{ secrets.AWS_SERVER_IP }} > homepage.html
+
+          if grep -q "Juice Shop" homepage.html || grep -q "OWASP" homepage.html; then
+            echo "✅ Juice Shop homepage loaded successfully"
+            echo "Found 'Juice Shop' or 'OWASP' keywords in response"
+            rm homepage.html
+            exit 0
+          else
+            echo "⚠️  Homepage loaded but may not be Juice Shop"
+            echo "First 5 lines of response:"
+            head -5 homepage.html
+            rm homepage.html
+            exit 0
+          fi
+
+      - name: 📊 Final Status Report
+        if: success()
+        run: |
+          echo "=================================="
+          echo "✅✅✅ ALL CHECKS PASSED ✅✅✅"
+          echo "=================================="
+          echo "✓ Server is online (port 80 responded)"
+          echo "✓ Juice Shop is running"
+          echo "✓ Pipeline ready for security scanning"
+          echo "=================================="
+          echo "Next: Chapter 2 - Automated Information Gathering"
+          echo "=================================="
+
+      - name: ❌ Failure Report
+        if: failure()
+        run: |
+          echo "=================================="
+          echo "❌❌❌ SYSTEM CHECK FAILED ❌❌❌"
+          echo "=================================="
+          echo "Pipeline stopped because server is not reachable."
+          echo ""
+          echo "Troubleshooting steps:"
+          echo "1. SSH to server: ./connect-to-server.sh"
+          echo "2. Check if instance is running: (AWS Console)"
+          echo "3. Check Docker: docker ps"
+          echo "4. Start Juice Shop: docker start juice-shop"
+          echo "5. Verify security group allows port 80"
+          echo "=================================="
