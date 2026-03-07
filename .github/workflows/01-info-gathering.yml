@@ -1,0 +1,19 @@
+name: 01 - Information Gathering
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Display server information
+        run: |
+          echo "Pipeline Started"
+          echo "Target Server: 13.205.25.48"
