@@ -1,80 +1,13 @@
-name: 01 - Information Gathering
-
-on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Display server information
+      - name: 🔴 TEST 1 - Is Server Reachable? (Port 80 Check)
         run: |
-          echo "🚀 Pipeline Started"
-          echo "Target IP: ${{ secrets.AWS_SERVER_IP }}"
-          echo "Target Domain: ${{ secrets.AWS_SERVER_DOMAIN }}"
-
-      - name: 🔴 TEST 1 - Is Server Reachable? (ICMP Ping)
-        run: |
-          echo "Sending ping to ${{ secrets.AWS_SERVER_IP }}..."
-          if ping -c 3 -W 5 ${{ secrets.AWS_SERVER_IP }} > /dev/null 2>&1; then
-            echo "✅ SERVER IS ONLINE - ICMP responded"
-            echo "server_status=online" >> $GITHUB_ENV
+          echo "Checking if server is online using port 80..."
+          if curl -s -o /dev/null --connect-timeout 5 http://${{ secrets.AWS_SERVER_IP }}; then
+            echo "✅ SERVER IS ONLINE (port 80 responded)"
           else
-            echo "❌ SERVER IS OFFLINE OR BLOCKING ICMP"
+            echo "❌ SERVER IS NOT RESPONDING on port 80"
             echo "This could mean:"
             echo "  1. EC2 instance is stopped"
-            echo "  2. Security Group blocks ICMP (ping)"
-            echo "  3. Network issue"
-            echo "server_status=offline" >> $GITHUB_ENV
-            exit 1  # This FAILS the pipeline
+            echo "  2. Juice Shop container is not running"
+            echo "  3. Security Group blocks port 80"
+            exit 1
           fi
-
-      - name: 🟡 TEST 2 - Is Juice Shop Running? (Port 80)
-        run: |
-          echo "Checking http://${{ secrets.AWS_SERVER_IP }}:80..."
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 http://${{ secrets.AWS_SERVER_IP }} || echo "000")
-          
-          if [ "$HTTP_CODE" = "200" ]; then
-            echo "✅ Juice Shop is RUNNING (HTTP 200 OK)"
-            echo "juice_status=running" >> $GITHUB_ENV
-          elif [ "$HTTP_CODE" = "302" ] || [ "$HTTP_CODE" = "301" ]; then
-            echo "⚠️ Juice Shop responded with redirect (HTTP $HTTP_CODE)"
-            echo "juice_status=redirect" >> $GITHUB_ENV
-          elif [ "$HTTP_CODE" = "000" ]; then
-            echo "❌ Juice Shop is NOT RESPONDING (connection timeout)"
-            echo "Check if container is running: docker ps"
-            echo "juice_status=down" >> $GITHUB_ENV
-            exit 1  # This FAILS the pipeline
-          else
-            echo "❌ Juice Shop responded with unexpected code: $HTTP_CODE"
-            echo "juice_status=error" >> $GITHUB_ENV
-            exit 1  # This FAILS the pipeline
-          fi
-
-      - name: 📊 Final Status Report
-        if: success()
-        run: |
-          echo "=================================="
-          echo "✅✅✅ ALL SYSTEMS OPERATIONAL ✅✅✅"
-          echo "=================================="
-          echo "✓ Server is online (ICMP ping responded)"
-          echo "✓ Juice Shop is running on port 80"
-          echo "✓ Pipeline can proceed with security scanning"
-          echo "=================================="
-
-      - name: ❌ Failure Report
-        if: failure()
-        run: |
-          echo "=================================="
-          echo "❌❌❌ SYSTEM CHECK FAILED ❌❌❌"
-          echo "=================================="
-          echo "Pipeline stopped because:"
-          echo "- Check the failed steps above"
-          echo "- Fix the issue and push again"
-          echo "=================================="
