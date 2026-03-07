@@ -13,7 +13,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Display server information
+      - name: Display server information from secrets
         run: |
-          echo "Pipeline Started"
-          echo "Target Server: 13.205.25.48"
+          echo "🚀 Pipeline Started"
+          echo "Target IP: ${{ secrets.AWS_SERVER_IP }}"
+          echo "Target Domain: ${{ secrets.AWS_SERVER_DOMAIN }}"
+
+      - name: Test connection to server
+        run: |
+          ping -c 2 ${{ secrets.AWS_SERVER_IP }}
