@@ -21,8 +21,8 @@ This project modernizes traditional penetration testing by transitioning manual 
 - **Instance Type:** t2.micro (Free tier eligible)
 - **Operating System:** Ubuntu Server 22.04 LTS
 - **Region:** ap-south-1 (Mumbai)
-- **Public IP:** 13.205.25.48
-- **Public DNS:** ec2-13-205-25-48.ap-south-1.compute.amazonaws.com
+- **Public IP:** ---------
+- **Public DNS:** ---------
 - **Key Pair:** devsecops-key.pem (stored locally, protected by .gitignore)
 
 #### c. Vulnerable Application Deployment ✅
@@ -30,7 +30,7 @@ This project modernizes traditional penetration testing by transitioning manual 
 - **Deployment Method:** Docker container
 - **Container Name:** juice-shop
 - **Port Mapping:** 80:3000 (Host:Container)
-- **Access URL:** http://13.205.25.48
+- **Access URL:** http://***********
 - **Auto-start:** Configured with restart policy
 
 #### d. Pipeline Initialization ✅
@@ -39,8 +39,8 @@ This project modernizes traditional penetration testing by transitioning manual 
 - **CI/CD Platform:** GitHub Actions
 - **Workflow Created:** 01-info-gathering.yml
 - **GitHub Secrets Configured:**
-  - `AWS_SERVER_IP`: 13.205.25.48
-  - `AWS_SERVER_DOMAIN`: ec2-13-205-25-48.ap-south-1.compute.amazonaws.com
+  - `AWS_SERVER_IP`: ----------
+  - `AWS_SERVER_DOMAIN`: ---------
 
 ---
 
