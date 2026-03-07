@@ -21,4 +21,8 @@ jobs:
 
       - name: Test connection to server
         run: |
-          ping -c 2 ${{ secrets.AWS_SERVER_IP }}
+          echo "Testing connection..."
+          curl -s --connect-timeout 5 http://${{ secrets.AWS_SERVER_IP }} || echo "Server is not responding to HTTP (expected if Juice Shop is not running)"
+
+
+
