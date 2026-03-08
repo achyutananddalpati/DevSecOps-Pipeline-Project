@@ -61,3 +61,20 @@ jobs:
           echo "Check the 'Actions' tab for detailed results"
           echo "Download 'nmap-scan-results' artifact for full report"
           echo "=================================="
+
+       - name: Check for dangerous open ports
+        run: |
+          echo "Checking for potentially dangerous open ports..."
+          echo ""
+
+          # List of ports that should typically be closed
+          DANGEROUS_PORTS="23 21 445 139 3389 5900 5432 3306"
+
+          for PORT in $DANGEROUS_PORTS; do
+            if grep -q "^$PORT/tcp" nmap-results.txt; then
+              echo "⚠️  WARNING: Port $PORT is OPEN - this should be closed in production"
+            fi
+          done
+
+          echo ""
+          echo "Port scan analysis complete."
