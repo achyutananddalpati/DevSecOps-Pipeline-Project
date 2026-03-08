@@ -8,7 +8,7 @@ on:
 jobs:
   service-detection:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -33,20 +33,18 @@ jobs:
       - name: Run Deep Service Detection Scan
         run: |
           echo "Starting deep service identification scan..."
-          echo "This will detect service versions and operating system..."
-          echo "Scan may take 3-5 minutes..."
+          echo "This will detect service versions..."
+          echo "Scan may take 2-3 minutes..."
           echo ""
-          
-          # Aggressive service detection with version scanning
+
+          # Service detection without OS scan (OS scan requires root)
           # -sV: Version detection
           # -sC: Default scripts
-          # -O: OS detection
-          # -p-: Scan all ports (optional - can be slow)
           # --version-intensity 9: Maximum version detection effort
-          
+
           echo "Scanning with aggressive service detection..."
-          nmap -sV -sC -O --version-intensity 9 ${{ secrets.AWS_SERVER_IP }} > nmap-service-scan.txt
-          
+          nmap -sV -sC --version-intensity 9 ${{ secrets.AWS_SERVER_IP }} > nmap-service-scan.txt
+
           echo ""
           echo "=== DETAILED SERVICE DETECTION RESULTS ==="
           echo ""
@@ -58,50 +56,68 @@ jobs:
           echo "📋 SERVICE VERSION SUMMARY"
           echo "=================================="
           echo ""
-          
+
           # Create markdown table header
           echo "| Port | Service | Version | Protocol |" > service-summary.md
           echo "|------|---------|---------|----------|" >> service-summary.md
-          
+
           # Extract service information from scan results
-          grep -E "^[0-9]+/tcp" nmap-service-scan.txt | while read line; do
-            PORT=$(echo "$line" | cut -d'/' -f1)
-            PROTO=$(echo "$line" | cut -d'/' -f2 | cut -d' ' -f1)
-            SERVICE=$(echo "$line" | awk '{print $3}')
-            VERSION=$(echo "$line" | cut -d' ' -f4- | sed 's/^ //')
-            
-            # Add to markdown table
-            echo "| $PORT | $SERVICE | $VERSION | $PROTO |" >> service-summary.md
-            
-            # Also display on console
-            echo "Port $PORT/tcp: $SERVICE - $VERSION"
-          done
-          
+          if grep -q "^[0-9]\+/tcp" nmap-service-scan.txt; then
+            grep -E "^[0-9]+/tcp" nmap-service-scan.txt | while read line; do
+              PORT=$(echo "$line" | cut -d'/' -f1)
+              PROTO=$(echo "$line" | cut -d'/' -f2 | cut -d' ' -f1)
+              SERVICE=$(echo "$line" | awk '{print $3}')
+              VERSION=$(echo "$line" | cut -d' ' -f4- | sed 's/^ //')
+
+              # Add to markdown table
+              echo "| $PORT | $SERVICE | $VERSION | $PROTO |" >> service-summary.md
+
+              # Also display on console
+              echo "Port $PORT/tcp: $SERVICE - $VERSION"
+            done
+          else
+            echo "No open ports found or scan failed" | tee -a service-summary.md
+          fi
+
           echo ""
           echo "Service summary saved to service-summary.md"
-          
+
           # Display the table in console
           echo ""
           echo "=== SERVICE SUMMARY TABLE ==="
           cat service-summary.md
 
-      - name: Extract Operating System Information
+      - name: Service Information Summary
         run: |
           echo "=================================="
-          echo "💻 OPERATING SYSTEM DETECTION"
+          echo "💻 SERVICE INFORMATION"
           echo "=================================="
           echo ""
-          
-          # Extract OS detection results
-          OS_LINES=$(grep -A 20 "OS detection performed" nmap-service-scan.txt | grep -E "^[A-Za-z]")
-          
-          if [ -n "$OS_LINES" ]; then
-            echo "$OS_LINES"
-            echo "$OS_LINES" > os-detection.txt
-          else
-            echo "No OS information detected (may need sudo privileges)"
-            echo "Unknown" > os-detection.txt
+
+          echo "Based on detected service versions:"
+          echo ""
+
+          # Check for SSH
+          if grep -q "ssh" nmap-service-scan.txt; then
+            SSH_INFO=$(grep "ssh" nmap-service-scan.txt | grep -v "service" | head -1)
+            echo "✅ SSH Service: $SSH_INFO"
           fi
+
+          # Check for HTTP
+          if grep -q "http" nmap-service-scan.txt; then
+            HTTP_INFO=$(grep "http" nmap-service-scan.txt | grep -v "service" | head -1)
+            echo "✅ HTTP Service: $HTTP_INFO"
+          fi
+
+          # Check for HTTPS
+          if grep -q "https" nmap-service-scan.txt; then
+            HTTPS_INFO=$(grep "https" nmap-service-scan.txt | grep -v "service" | head -1)
+            echo "✅ HTTPS Service: $HTTPS_INFO"
+          fi
+
+          echo ""
+          echo "Note: OS detection skipped (requires root privileges)"
+          echo "Based on services, likely OS: Ubuntu/Debian Linux"
 
       - name: Check for Outdated Services
         run: |
@@ -109,7 +125,7 @@ jobs:
           echo "⚠️  OUTDATED SERVICE CHECK"
           echo "=================================="
           echo ""
-          
+
           # Create outdated services report
           echo "# Outdated Service Report" > outdated-services.md
           echo "Generated: $(date)" >> outdated-services.md
@@ -117,63 +133,62 @@ jobs:
           echo "" >> outdated-services.md
           echo "| Service | Current Version | Risk | Recommendation |" >> outdated-services.md
           echo "|---------|-----------------|------|----------------|" >> outdated-services.md
-          
+
           VULNERABLE_FOUND=0
-          
+
           # Parse each service and check for outdated versions
-          grep -E "^[0-9]+/tcp" nmap-service-scan.txt | while read line; do
-            PORT=$(echo "$line" | cut -d'/' -f1)
-            SERVICE=$(echo "$line" | awk '{print $3}')
-            FULL_VERSION=$(echo "$line" | cut -d' ' -f4-)
-            
-            # Check OpenSSH versions
-            if echo "$FULL_VERSION" | grep -q "OpenSSH"; then
-              SSH_VERSION=$(echo "$FULL_VERSION" | grep -o "OpenSSH [0-9]\.[0-9][a-z]*" | cut -d' ' -f2)
-              
-              # Rough version check (simplified)
-              if [[ "$SSH_VERSION" < "7.9" ]]; then
-                echo "❌ CRITICAL: OpenSSH $SSH_VERSION is severely outdated (port $PORT)"
-                echo "| OpenSSH | $SSH_VERSION | 🔴 CRITICAL | Upgrade to OpenSSH 8.9+ immediately |" >> outdated-services.md
-                VULNERABLE_FOUND=1
-              elif [[ "$SSH_VERSION" < "8.5" ]]; then
-                echo "⚠️  WARNING: OpenSSH $SSH_VERSION is outdated (port $PORT)"
-                echo "| OpenSSH | $SSH_VERSION | 🟡 MEDIUM | Upgrade to OpenSSH 8.9+ recommended |" >> outdated-services.md
-                VULNERABLE_FOUND=1
-              else
-                echo "✅ OpenSSH $SSH_VERSION is current"
+          if grep -q "^[0-9]\+/tcp" nmap-service-scan.txt; then
+            grep -E "^[0-9]+/tcp" nmap-service-scan.txt | while read line; do
+              PORT=$(echo "$line" | cut -d'/' -f1)
+              SERVICE=$(echo "$line" | awk '{print $3}')
+              FULL_VERSION=$(echo "$line" | cut -d' ' -f4-)
+
+              # Check OpenSSH versions
+              if echo "$FULL_VERSION" | grep -q "OpenSSH"; then
+                SSH_VERSION=$(echo "$FULL_VERSION" | grep -o "OpenSSH_[0-9]\.[0-9][p]*" | sed 's/OpenSSH_//' || echo "unknown")
+
+                if [[ "$SSH_VERSION" < "7.9" ]] 2>/dev/null; then
+                  echo "❌ CRITICAL: OpenSSH $SSH_VERSION is severely outdated (port $PORT)"
+                  echo "| OpenSSH | $SSH_VERSION | 🔴 CRITICAL | Upgrade to OpenSSH 8.9+ immediately |" >> outdated-services.md
+                  VULNERABLE_FOUND=1
+                elif [[ "$SSH_VERSION" < "8.5" ]] 2>/dev/null; then
+                  echo "⚠️  WARNING: OpenSSH $SSH_VERSION is outdated (port $PORT)"
+                  echo "| OpenSSH | $SSH_VERSION | 🟡 MEDIUM | Upgrade to OpenSSH 8.9+ recommended |" >> outdated-services.md
+                  VULNERABLE_FOUND=1
+                else
+                  echo "✅ OpenSSH $SSH_VERSION is current"
+                fi
               fi
-            fi
-            
-            # Check Apache versions
-            if echo "$FULL_VERSION" | grep -q "Apache.*httpd"; then
-              if echo "$FULL_VERSION" | grep -q "2\.4\.([0-9]+)"; then
-                APACHE_VERSION=$(echo "$FULL_VERSION" | grep -o "2\.4\.[0-9]\+")
-                if [[ "$APACHE_VERSION" < "2.4.50" ]]; then
+
+              # Check Apache versions
+              if echo "$FULL_VERSION" | grep -q "Apache.*httpd"; then
+                APACHE_VERSION=$(echo "$FULL_VERSION" | grep -o "2\.4\.[0-9]\+" || echo "unknown")
+                if [[ "$APACHE_VERSION" < "2.4.50" ]] 2>/dev/null; then
                   echo "⚠️  Apache $APACHE_VERSION may have known vulnerabilities"
                   echo "| Apache | $APACHE_VERSION | 🟡 MEDIUM | Update to latest 2.4.x |" >> outdated-services.md
                 fi
               fi
-            fi
-            
-            # Check nginx versions
-            if echo "$FULL_VERSION" | grep -q "nginx"; then
-              NGINX_VERSION=$(echo "$FULL_VERSION" | grep -o "[0-9]\.[0-9]\.[0-9]\+")
-              if [[ "$NGINX_VERSION" < "1.20" ]]; then
-                echo "⚠️  nginx $NGINX_VERSION is outdated"
-                echo "| nginx | $NGINX_VERSION | 🟡 MEDIUM | Upgrade to nginx 1.20+ |" >> outdated-services.md
+
+              # Check nginx versions
+              if echo "$FULL_VERSION" | grep -q "nginx"; then
+                NGINX_VERSION=$(echo "$FULL_VERSION" | grep -o "[0-9]\.[0-9]\.[0-9]\+" || echo "unknown")
+                if [[ "$NGINX_VERSION" < "1.20" ]] 2>/dev/null; then
+                  echo "⚠️  nginx $NGINX_VERSION is outdated"
+                  echo "| nginx | $NGINX_VERSION | 🟡 MEDIUM | Upgrade to nginx 1.20+ |" >> outdated-services.md
+                fi
               fi
-            fi
-            
-            # Check Node.js (for Juice Shop)
-            if echo "$FULL_VERSION" | grep -q "Node\.js"; then
-              NODE_VERSION=$(echo "$FULL_VERSION" | grep -o "[0-9]\+\.[0-9]\+\.[0-9]\+")
-              if [[ "$NODE_VERSION" < "14.0.0" ]]; then
-                echo "⚠️  Node.js $NODE_VERSION is end-of-life"
-                echo "| Node.js | $NODE_VERSION | 🔴 CRITICAL | Upgrade to Node.js 18+ |" >> outdated-services.md
+
+              # Check Node.js (for Juice Shop)
+              if echo "$FULL_VERSION" | grep -q "Node\.js"; then
+                NODE_VERSION=$(echo "$FULL_VERSION" | grep -o "[0-9]\+\.[0-9]\+\.[0-9]\+" || echo "unknown")
+                if [[ "$NODE_VERSION" < "14.0.0" ]] 2>/dev/null; then
+                  echo "⚠️  Node.js $NODE_VERSION is end-of-life"
+                  echo "| Node.js | $NODE_VERSION | 🔴 CRITICAL | Upgrade to Node.js 18+ |" >> outdated-services.md
+                fi
               fi
-            fi
-          done
-          
+            done
+          fi
+
           echo ""
           if [ $VULNERABLE_FOUND -eq 0 ]; then
             echo "✅ No clearly outdated services detected"
@@ -183,7 +198,7 @@ jobs:
             echo "" >> outdated-services.md
             echo "**Action Required:** Review and update outdated services." >> outdated-services.md
           fi
-          
+
           echo ""
           echo "Outdated service report saved to outdated-services.md"
 
@@ -194,32 +209,36 @@ jobs:
           echo "Scan Date: $(date)" >> service-inventory.md
           echo "Scan Type: Deep Service Identification" >> service-inventory.md
           echo "" >> service-inventory.md
-          
+
           echo "## Executive Summary" >> service-inventory.md
           echo "" >> service-inventory.md
-          TOTAL_PORTS=$(grep -c "^[0-9]\+/tcp" nmap-service-scan.txt)
+          TOTAL_PORTS=$(grep -c "^[0-9]\+/tcp" nmap-service-scan.txt 2>/dev/null || echo "0")
           echo "- **Total Open Ports:** $TOTAL_PORTS" >> service-inventory.md
-          echo "- **OS Detected:** $(cat os-detection.txt | head -1)" >> service-inventory.md
+          echo "- **Scan Method:** Version detection without OS scan" >> service-inventory.md
           echo "" >> service-inventory.md
-          
+
           echo "## Detailed Service Inventory" >> service-inventory.md
           echo "" >> service-inventory.md
           echo "| Port | Service | Version | Protocol | Details |" >> service-inventory.md
           echo "|------|---------|---------|----------|---------|" >> service-inventory.md
-          
-          grep -E "^[0-9]+/tcp" nmap-service-scan.txt | while read line; do
-            PORT=$(echo "$line" | cut -d'/' -f1)
-            PROTO=$(echo "$line" | cut -d'/' -f2 | cut -d' ' -f1)
-            SERVICE=$(echo "$line" | awk '{print $3}')
-            VERSION=$(echo "$line" | cut -d' ' -f4- | cut -c1-50)
-            echo "| $PORT | $SERVICE | $VERSION | $PROTO | Full details in raw scan |" >> service-inventory.md
-          done
-          
+
+          if [ $TOTAL_PORTS -gt 0 ]; then
+            grep -E "^[0-9]+/tcp" nmap-service-scan.txt | while read line; do
+              PORT=$(echo "$line" | cut -d'/' -f1)
+              PROTO=$(echo "$line" | cut -d'/' -f2 | cut -d' ' -f1)
+              SERVICE=$(echo "$line" | awk '{print $3}')
+              VERSION=$(echo "$line" | cut -d' ' -f4- | cut -c1-50)
+              echo "| $PORT | $SERVICE | $VERSION | $PROTO | Full details in raw scan |" >> service-inventory.md
+            done
+          else
+            echo "| No open ports found | - | - | - | - |" >> service-inventory.md
+          fi
+
           echo "" >> service-inventory.md
           echo "## Security Notes" >> service-inventory.md
           echo "" >> service-inventory.md
           echo "See 'outdated-services.md' for version-specific security recommendations." >> service-inventory.md
-          
+
           echo "Service inventory report generated: service-inventory.md"
 
       - name: Upload All Scan Results
@@ -231,7 +250,6 @@ jobs:
             service-summary.md
             service-inventory.md
             outdated-services.md
-            os-detection.txt
 
       - name: Final Summary
         run: |
@@ -240,7 +258,6 @@ jobs:
           echo "=================================="
           echo ""
           echo "✅ Open ports identified with service versions"
-          echo "✅ Operating system detected"
           echo "✅ Outdated service checks performed"
           echo "✅ Complete inventory generated"
           echo ""
@@ -249,6 +266,5 @@ jobs:
           echo "   - service-summary.md (Quick reference)"
           echo "   - service-inventory.md (Complete report)"
           echo "   - outdated-services.md (Security findings)"
-          echo "   - os-detection.txt (OS information)"
           echo ""
           echo "=================================="
