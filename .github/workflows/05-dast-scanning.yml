@@ -5,7 +5,7 @@ on:
     branches: [ main ]
   workflow_dispatch:
   schedule:
-    - cron: '0 0 * * 0'  # Weekly scan
+    - cron: '0 0 * * 0'
 
 jobs:
   zap-scan:
@@ -22,68 +22,67 @@ jobs:
           echo "=================================="
           echo "Target: http://${{ secrets.AWS_SERVER_IP }}"
           echo "Tool: OWASP ZAP"
-          echo "Scan Type: Full Active Scan"
           echo "=================================="
 
-      - name: Install Java (required for ZAP)
+      - name: Install Java
         run: |
           sudo apt-get update
           sudo apt-get install -y openjdk-17-jre-headless
           java -version
 
-      - name: Download and install OWASP ZAP
+      - name: Download and install OWASP ZAP (working version)
         run: |
-          wget -q https://github.com/zaproxy/zaproxy/releases/download/v2.14.0/ZAP_2.14.0_Linux.tar.gz
-          tar -xzf ZAP_2.14.0_Linux.tar.gz
+          # Use the stable weekly release which is guaranteed to exist
+          wget -q https://github.com/zaproxy/zaproxy/releases/download/w2024-09-23/ZAP_2024-09-23_Linux.tar.gz
+          tar -xzf ZAP_2024-09-23_Linux.tar.gz
+          mv ZAP_2024-09-23 ZAP
           echo "ZAP installed successfully"
-          ls -la ZAP_2.14.0/
+          ls -la ZAP/
 
       - name: Start ZAP in daemon mode
         run: |
           echo "Starting ZAP daemon..."
-          ./ZAP_2.14.0/zap.sh -daemon -port 8080 -config api.disablekey=true -host 0.0.0.0 &
+          ./ZAP/zap.sh -daemon -port 8080 -config api.disablekey=true -host 0.0.0.0 &
           ZAP_PID=$!
           echo "ZAP_PID=$ZAP_PID" >> $GITHUB_ENV
 
           # Wait for ZAP to start
           echo "Waiting for ZAP to initialize..."
-          sleep 30
+          for i in {1..30}; do
+            if curl -s http://localhost:8080 > /dev/null; then
+              echo "ZAP is ready!"
+              break
+            fi
+            echo "Waiting... ($i/30)"
+            sleep 5
+          done
 
-          # Check if ZAP is running
-          curl -s http://localhost:8080 || echo "ZAP not responding yet"
-          echo "ZAP daemon started with PID: $ZAP_PID"
-
-      - name: Run ZAP Spider Scan (Crawl the application)
+      - name: Run ZAP Spider Scan
         run: |
           echo "Starting spider scan to discover URLs..."
-          echo ""
 
-          # Spider the target to discover all pages
-          curl "http://localhost:8080/JSON/spider/action/scan/?url=http://${{ secrets.AWS_SERVER_IP }}&maxChildren=10&recurse=true&contextName=&subtreeOnly="
+          # Start spider
+          curl -s "http://localhost:8080/JSON/spider/action/scan/?url=http://${{ secrets.AWS_SERVER_IP }}&maxChildren=10&recurse=true"
 
           # Wait for spider to complete
           echo "Spidering in progress... waiting 60 seconds"
           sleep 60
 
-          # Check spider status
-          curl "http://localhost:8080/JSON/spider/view/status/"
-          echo ""
           echo "Spider scan completed"
 
       - name: Run ZAP Active Scan
         run: |
           echo "Starting active scan (this will attack the application)..."
           echo "This may take 5-10 minutes..."
-          echo ""
 
           # Start active scan
-          curl "http://localhost:8080/JSON/ascan/action/scan/?url=http://${{ secrets.AWS_SERVER_IP }}&recurse=true&inScopeOnly=false&scanPolicyName=&method=&postData=&contextId="
+          curl -s "http://localhost:8080/JSON/ascan/action/scan/?url=http://${{ secrets.AWS_SERVER_IP }}&recurse=true"
 
           # Monitor scan progress
-          for i in {1..30}; do
-            sleep 30
-            PROGRESS=$(curl -s "http://localhost:8080/JSON/ascan/view/status/?scanId=0" | grep -o '[0-9]\+' || echo "0")
-            echo "Active scan progress: ${PROGRESS}%"
+          for i in {1..60}; do
+            sleep 10
+            PROGRESS=$(curl -s "http://localhost:8080/JSON/ascan/view/status/?scanId=0" | grep -o '"status":"[0-9]*"' | cut -d':' -f2 | tr -d '"')
+            echo "Progress: ${PROGRESS}%"
             if [ "$PROGRESS" = "100" ]; then
               break
             fi
@@ -95,60 +94,84 @@ jobs:
         run: |
           echo "Generating ZAP HTML report..."
 
-          # Generate report using ZAP API
-          curl "http://localhost:8080/JSON/reports/action/generate/?title=ZAP Scan Report&template=traditional-html&sections=&includeConfidence=true&includeRisk=true&reportDir=/home/runner/work/DevSecOps-Pipeline-Project/DevSecOps-Pipeline-Project/&reportFileName=zap-report.html&reportDirChoice=1&display=true"
+          # Use ZAP API to generate report
+          curl -s "http://localhost:8080/JSON/reports/action/generate/" \
+            -d "title=ZAP Scan Report" \
+            -d "template=traditional-html" \
+            -d "theme=light" \
+            -d "description=DAST scan of Juice Shop" \
+            -d "contexts=" \
+            -d "sites=http://${{ secrets.AWS_SERVER_IP }}" \
+            -d "sections=" \
+            -d "reportDir=/home/runner/work/DevSecOps-Pipeline-Project/DevSecOps-Pipeline-Project/" \
+            -d "reportFileName=zap-report" \
+            -d "reportDirChoice=1"
 
-          # Wait for report generation
           sleep 10
 
           # Check if report was generated
           if [ -f zap-report.html ]; then
             echo "✅ HTML report generated: zap-report.html"
+            echo "Report size: $(wc -l < zap-report.html) lines"
           else
-            echo "⚠️ Report not found, creating summary from API"
-            # Fallback: Get alerts from API
-            curl -s "http://localhost:8080/JSON/core/view/alerts/?baseurl=http://${{ secrets.AWS_SERVER_IP }}" > alerts.json
+            # Fallback: Create simple report with API data
+            echo "Creating fallback report..."
             echo "<html><body><h1>ZAP Scan Results</h1>" > zap-report.html
             echo "<p>Target: http://${{ secrets.AWS_SERVER_IP }}</p>" >> zap-report.html
             echo "<p>Date: $(date)</p>" >> zap-report.html
-            cat alerts.json >> zap-report.html
-            echo "</body></html>" >> zap-report.html
+            echo "<h2>Alerts Found:</h2>" >> zap-report.html
+            echo "<pre>" >> zap-report.html
+            curl -s "http://localhost:8080/JSON/core/view/alerts/" >> zap-report.html
+            echo "</pre></body></html>" >> zap-report.html
           fi
 
-      - name: Generate Markdown Summary
+      - name: Get Alert Summary
         run: |
-          echo "# OWASP ZAP DAST Scan Results" > zap-summary.md
-          echo "" >> zap-summary.md
-          echo "## Scan Information" >> zap-summary.md
-          echo "- **Target:** http://${{ secrets.AWS_SERVER_IP }}" >> zap-summary.md
-          echo "- **Date:** $(date)" >> zap-summary.md
-          echo "- **Tool:** OWASP ZAP 2.14.0" >> zap-summary.md
-          echo "" >> zap-summary.md
+          echo "=================================="
+          echo "📊 ALERT SUMMARY"
+          echo "=================================="
 
-          # Try to get alert counts from ZAP API
-          echo "## Vulnerability Summary" >> zap-summary.md
+          # Get alert counts from API
+          ALERTS=$(curl -s "http://localhost:8080/JSON/core/view/alertsSummary/?baseurl=http://${{ secrets.AWS_SERVER_IP }}")
+
+          HIGH=$(echo $ALERTS | grep -o '"high":[0-9]*' | cut -d':' -f2 || echo "0")
+          MEDIUM=$(echo $ALERTS | grep -o '"medium":[0-9]*' | cut -d':' -f2 || echo "0")
+          LOW=$(echo $ALERTS | grep -o '"low":[0-9]*' | cut -d':' -f2 || echo "0")
+          INFO=$(echo $ALERTS | grep -o '"info":[0-9]*' | cut -d':' -f2 || echo "0")
+
+          echo ""
+          echo "| Risk Level | Count |"
+          echo "|------------|-------|"
+          echo "| 🔴 High    | $HIGH |"
+          echo "| 🟡 Medium  | $MEDIUM |"
+          echo "| 🟢 Low     | $LOW |"
+          echo "| ℹ️ Info    | $INFO |"
+          echo ""
+
+          # Save to file
+          echo "# ZAP Scan Summary" > zap-summary.md
+          echo "Target: http://${{ secrets.AWS_SERVER_IP }}" >> zap-summary.md
+          echo "Date: $(date)" >> zap-summary.md
           echo "" >> zap-summary.md
-
-          HIGH_COUNT=$(curl -s "http://localhost:8080/JSON/core/view/alertsSummary/?baseurl=http://${{ secrets.AWS_SERVER_IP }}" | grep -o '"high":[0-9]*' | cut -d':' -f2 || echo "0")
-          MED_COUNT=$(curl -s "http://localhost:8080/JSON/core/view/alertsSummary/?baseurl=http://${{ secrets.AWS_SERVER_IP }}" | grep -o '"medium":[0-9]*' | cut -d':' -f2 || echo "0")
-          LOW_COUNT=$(curl -s "http://localhost:8080/JSON/core/view/alertsSummary/?baseurl=http://${{ secrets.AWS_SERVER_IP }}" | grep -o '"low":[0-9]*' | cut -d':' -f2 || echo "0")
-
+          echo "## Alert Summary" >> zap-summary.md
+          echo "" >> zap-summary.md
           echo "| Risk Level | Count |" >> zap-summary.md
           echo "|------------|-------|" >> zap-summary.md
-          echo "| 🔴 High | $HIGH_COUNT |" >> zap-summary.md
-          echo "| 🟡 Medium | $MED_COUNT |" >> zap-summary.md
-          echo "| 🟢 Low | $LOW_COUNT |" >> zap-summary.md
-          echo "" >> zap-summary.md
+          echo "| 🔴 High | $HIGH |" >> zap-summary.md
+          echo "| 🟡 Medium | $MEDIUM |" >> zap-summary.md
+          echo "| 🟢 Low | $LOW |" >> zap-summary.md
+          echo "| ℹ️ Info | $INFO |" >> zap-summary.md
 
-          echo "## Important Note" >> zap-summary.md
-          echo "" >> zap-summary.md
-          echo "OWASP Juice Shop is **intentionally vulnerable**. The findings above are expected and demonstrate that the DAST scan is working properly." >> zap-summary.md
-
-          cat zap-summary.md
+          if [ "$HIGH" -gt 0 ]; then
+            echo "" >> zap-summary.md
+            echo "⚠️ **High risk vulnerabilities detected!**" >> zap-summary.md
+            echo "This is expected for OWASP Juice Shop." >> zap-summary.md
+          fi
 
       - name: Stop ZAP daemon
+        if: always()
         run: |
-          kill ${{ env.ZAP_PID }} || true
+          kill ${{ env.ZAP_PID }} 2>/dev/null || true
           echo "ZAP daemon stopped"
 
       - name: Upload Scan Results
@@ -158,13 +181,12 @@ jobs:
           path: |
             zap-report.html
             zap-summary.md
-            alerts.json
 
       - name: Final Summary
         run: |
           echo "=================================="
           echo "✅ DAST SCAN COMPLETED"
           echo "=================================="
-          echo "📁 Artifacts: zap-scan-results"
-          echo "📊 Download and open zap-report.html"
+          echo "📁 Download artifacts: zap-scan-results"
+          echo "📊 Open zap-report.html in browser"
           echo "=================================="
