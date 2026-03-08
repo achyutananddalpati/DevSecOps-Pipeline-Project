@@ -1,4 +1,4 @@
-#name: 01 - Information Gathering
+name: 01 - Information Gathering
 
 on:
   push:
