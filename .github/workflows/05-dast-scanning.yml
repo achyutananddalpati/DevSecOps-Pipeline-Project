@@ -31,7 +31,7 @@ jobs:
         with:
           target: 'http://${{ secrets.AWS_SERVER_IP }}'
           rules_file_name: '.zap/rules.tsv'
-          cmd_options: '-a -j'
+          cmd_options: '-a -j -I'
 
       - name: ZAP Full Scan
         id: fullscan
@@ -39,7 +39,7 @@ jobs:
         with:
           target: 'http://${{ secrets.AWS_SERVER_IP }}'
           rules_file_name: '.zap/rules.tsv'
-          cmd_options: '-a -j'
+          cmd_options: '-a -j -I'
 
       - name: Create Summary Report
         run: |
