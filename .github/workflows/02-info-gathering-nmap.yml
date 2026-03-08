@@ -1,0 +1,63 @@
+name: 02 - Information Gathering with Nmap
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  port-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Display scan target
+        run: |
+          echo "=================================="
+          echo "🔍 STARTING INFORMATION GATHERING"
+          echo "=================================="
+          echo "Target: ${{ secrets.AWS_SERVER_IP }}"
+          echo "=================================="
+
+      - name: Install Nmap
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nmap
+          echo ""
+          echo "Nmap version installed:"
+          nmap --version
+
+      - name: Run Nmap Port Scan
+        run: |
+          echo "Scanning ${{ secrets.AWS_SERVER_IP }} for open ports..."
+          echo "This may take 1-2 minutes..."
+          echo ""
+          
+          # Fast scan of top 100 ports with service detection
+          nmap -F -sV --open ${{ secrets.AWS_SERVER_IP }} > nmap-results.txt
+          
+          echo "=== SCAN RESULTS ==="
+          echo ""
+          cat nmap-results.txt
+          
+          # Count open ports
+          OPEN_PORTS=$(grep -c "^[0-9]\+/tcp" nmap-results.txt || echo "0")
+          echo ""
+          echo "✅ Scan complete. Found $OPEN_PORTS open ports."
+
+      - name: Upload scan results as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nmap-scan-results
+          path: nmap-results.txt
+
+      - name: Display summary
+        run: |
+          echo "=================================="
+          echo "📊 INFORMATION GATHERING COMPLETE"
+          echo "=================================="
+          echo "Check the 'Actions' tab for detailed results"
+          echo "Download 'nmap-scan-results' artifact for full report"
+          echo "=================================="
