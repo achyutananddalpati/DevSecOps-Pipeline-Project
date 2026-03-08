@@ -44,7 +44,7 @@ This project modernizes traditional penetration testing by transitioning manual 
 
 ---
 
-## Chapter 2: Perform Automated Information Gathering (In Progress)
+## Chapter 2: Perform Automated Information Gathering
 
 ### Planned Tasks:
 
