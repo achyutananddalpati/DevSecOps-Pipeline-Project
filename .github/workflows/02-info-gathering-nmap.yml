@@ -1,4 +1,4 @@
-#name: 02 - Information Gathering with Nmap
+name: 02 - Information Gathering with Nmap
 
 on:
   push:
