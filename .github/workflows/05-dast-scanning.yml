@@ -10,7 +10,7 @@ on:
 jobs:
   zap-scan:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -25,64 +25,42 @@ jobs:
           echo "Scan Type: Active Vulnerability Scan"
           echo "=================================="
 
-      - name: Install OWASP ZAP
+      - name: Run OWASP ZAP Baseline Scan (Docker)
         run: |
-          echo "Installing OWASP ZAP..."
-          sudo apt-get update
-          sudo apt-get install -y wget openjdk-11-jre
-          
-          # Download and install ZAP
-          wget -q https://github.com/zaproxy/zaproxy/releases/download/v2.14.0/ZAP_2.14.0_Linux.tar.gz
-          tar -xzf ZAP_2.14.0_Linux.tar.gz
-          
+          echo "Starting ZAP Baseline Scan using Docker..."
           echo ""
-          echo "OWASP ZAP installed successfully"
-          ls -la ZAP_2.14.0/
 
-      - name: Run ZAP Baseline Scan
-        run: |
-          echo "Starting ZAP Baseline Scan..."
-          echo "This scan checks for common vulnerabilities without aggressive attacks"
-          echo ""
-          
-          # Run ZAP in daemon mode with baseline scan
-          ./ZAP_2.14.0/zap.sh -daemon -port 8080 -config api.disablekey=true &
-          ZAP_PID=$!
-          
-          # Wait for ZAP to start
-          echo "Waiting for ZAP to start..."
-          sleep 15
-          
-          # Run baseline scan against target
-          ./ZAP_2.14.0/zap.sh -cmd -quickurl http://${{ secrets.AWS_SERVER_IP }} -quickprogress -quickout zap-baseline-report.html
-          
+          # Run ZAP baseline scan using Docker (more reliable)
+          docker run --rm -v $(pwd):/zap/wrk/:rw -t ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+            -t http://${{ secrets.AWS_SERVER_IP }} \
+            -g gen.conf \
+            -r zap-baseline-report.html \
+            -w zap-baseline-report.md \
+            -x zap-baseline-report.xml \
+            -I || true
+
           echo ""
           echo "Baseline scan completed"
-          
-          # Kill ZAP daemon
-          kill $ZAP_PID 2>/dev/null || true
+          ls -la zap-baseline-report* 2>/dev/null || echo "No baseline report generated"
 
-      - name: Run ZAP Full Active Scan
+      - name: Run ZAP Full Active Scan (Docker)
         run: |
-          echo "Starting ZAP Full Active Scan..."
+          echo "Starting ZAP Full Active Scan using Docker..."
           echo "This performs aggressive vulnerability testing (may take 5-10 minutes)"
           echo ""
-          
-          # Start ZAP daemon
-          ./ZAP_2.14.0/zap.sh -daemon -port 8080 -config api.disablekey=true &
-          ZAP_PID=$!
-          
-          # Wait for ZAP to start
-          sleep 15
-          
-          # Run full active scan
-          ./ZAP_2.14.0/zap.sh -cmd -quickurl http://${{ secrets.AWS_SERVER_IP }} -quickprogress -quickout zap-full-report.html -quickadvanced
-          
+
+          # Run ZAP full scan using Docker
+          docker run --rm -v $(pwd):/zap/wrk/:rw -t ghcr.io/zaproxy/zaproxy:stable zap-full-scan.py \
+            -t http://${{ secrets.AWS_SERVER_IP }} \
+            -g gen.conf \
+            -r zap-full-report.html \
+            -w zap-full-report.md \
+            -x zap-full-report.xml \
+            -I || true
+
           echo ""
           echo "Full active scan completed"
-          
-          # Kill ZAP daemon
-          kill $ZAP_PID 2>/dev/null || true
+          ls -la zap-full-report* 2>/dev/null || echo "No full report generated"
 
       - name: Generate ZAP Report Summary
         run: |
@@ -90,82 +68,55 @@ jobs:
           echo "📋 ZAP SCAN SUMMARY"
           echo "=================================="
           echo ""
-          
+
           # Create summary report
           echo "# OWASP ZAP Vulnerability Scan Report" > zap-summary.md
           echo "Target: http://${{ secrets.AWS_SERVER_IP }}" >> zap-summary.md
           echo "Scan Date: $(date)" >> zap-summary.md
           echo "" >> zap-summary.md
-          
-          # Check if baseline report exists and extract info
-          if [ -f zap-baseline-report.html ]; then
-            echo "## Baseline Scan Results" >> zap-summary.md
-            echo "" >> zap-summary.md
-            echo "✅ Baseline scan completed" >> zap-summary.md
-            
-            # Extract alert count (simplified - just for summary)
-            ALERT_COUNT=$(grep -c "alert" zap-baseline-report.html || echo "0")
-            echo "- Baseline scan found approximately $ALERT_COUNT potential issues" >> zap-summary.md
-          fi
-          
-          echo "" >> zap-summary.md
-          
-          # Check if full report exists
-          if [ -f zap-full-report.html ]; then
-            echo "## Full Active Scan Results" >> zap-summary.md
-            echo "" >> zap-summary.md
-            echo "✅ Full active scan completed" >> zap-summary.md
-            echo "- Detailed results in HTML report" >> zap-summary.md
-          fi
-          
-          echo "" >> zap-summary.md
-          echo "## Risk Summary" >> zap-summary.md
-          echo "" >> zap-summary.md
-          echo "| Risk Level | Count |" >> zap-summary.md
-          echo "|------------|-------|" >> zap-summary.md
-          
-          # Try to extract risk counts from HTML (simplified)
-          HIGH_COUNT=$(grep -i "high" zap-full-report.html 2>/dev/null | grep -c "alert" || echo "0")
-          MED_COUNT=$(grep -i "medium" zap-full-report.html 2>/dev/null | grep -c "alert" || echo "0")
-          LOW_COUNT=$(grep -i "low" zap-full-report.html 2>/dev/null | grep -c "alert" || echo "0")
-          
-          echo "| High | $HIGH_COUNT |" >> zap-summary.md
-          echo "| Medium | $MED_COUNT |" >> zap-summary.md
-          echo "| Low | $LOW_COUNT |" >> zap-summary.md
-          
-          echo "" >> zap-summary.md
-          echo "See attached HTML reports for complete details." >> zap-summary.md
-          
-          echo "ZAP summary report created: zap-summary.md"
-          cat zap-summary.md
 
-      - name: Check for Critical Vulnerabilities
-        run: |
-          echo "Checking for critical vulnerabilities..."
-          echo ""
-          
-          # Simple check for high-risk findings
+          # Extract findings from reports if they exist
+          echo "## Scan Results" >> zap-summary.md
+          echo "" >> zap-summary.md
+
           if [ -f zap-full-report.html ]; then
-            if grep -q -i "high" zap-full-report.html; then
-              echo "⚠️  HIGH RISK VULNERABILITIES DETECTED!"
-              echo "Review the full report for details."
-              # Uncomment to fail pipeline on high findings
-              # exit 1
-            else
-              echo "✅ No high-risk vulnerabilities detected in automated scan"
-            fi
+            echo "✅ Full active scan completed" >> zap-summary.md
+            echo "" >> zap-summary.md
+
+            # Try to extract alert counts (simplified)
+            HIGH_COUNT=$(grep -c "alertHigh" zap-full-report.html 2>/dev/null || echo "0")
+            MED_COUNT=$(grep -c "alertMedium" zap-full-report.html 2>/dev/null || echo "0")
+            LOW_COUNT=$(grep -c "alertLow" zap-full-report.html 2>/dev/null || echo "0")
+            INFO_COUNT=$(grep -c "alertInfo" zap-full-report.html 2>/dev/null || echo "0")
+
+            echo "| Risk Level | Count |" >> zap-summary.md
+            echo "|------------|-------|" >> zap-summary.md
+            echo "| High | $HIGH_COUNT |" >> zap-summary.md
+            echo "| Medium | $MED_COUNT |" >> zap-summary.md
+            echo "| Low | $LOW_COUNT |" >> zap-summary.md
+            echo "| Info | $INFO_COUNT |" >> zap-summary.md
           else
-            echo "Full report not available - skipping critical check"
+            echo "⚠️ No detailed report available" >> zap-summary.md
           fi
+
+          echo "" >> zap-summary.md
+          echo "## Notes" >> zap-summary.md
+          echo "- Juice Shop is intentionally vulnerable" >> zap-summary.md
+          echo "- Findings are expected for this test application" >> zap-summary.md
+          echo "- See HTML reports for complete details" >> zap-summary.md
+
+          echo ""
+          echo "ZAP summary report created:"
+          cat zap-summary.md
 
       - name: Upload ZAP Reports
         uses: actions/upload-artifact@v4
         with:
           name: zap-scan-results
           path: |
-            zap-baseline-report.html
-            zap-full-report.html
-            zap-summary.md
+            zap-*.html
+            zap-*.md
+            zap-*.xml
 
       - name: Final Summary
         run: |
@@ -173,7 +124,7 @@ jobs:
           echo "🛡️ DAST SCANNING COMPLETE"
           echo "=================================="
           echo ""
-          echo "✅ OWASP ZAP scans executed"
+          echo "✅ OWASP ZAP scans executed via Docker"
           echo "📊 Reports generated and saved"
           echo ""
           echo "📁 Artifacts available for download:"
@@ -181,5 +132,5 @@ jobs:
           echo "   - zap-full-report.html (Detailed active scan)"
           echo "   - zap-summary.md (Executive summary)"
           echo ""
-          echo "Review reports for vulnerabilities in Juice Shop"
+          echo "Note: ZAP scans may show vulnerabilities - this is expected for Juice Shop"
           echo "=================================="
