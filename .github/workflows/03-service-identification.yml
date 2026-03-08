@@ -1,4 +1,4 @@
-name: 03 - Service Identification (Deep Version Detection)
+#name: 03 - Service Identification (Deep Version Detection)
 
 on:
   push:
