@@ -62,19 +62,31 @@ jobs:
           echo "Download 'nmap-scan-results' artifact for full report"
           echo "=================================="
 
-       - name: Check for dangerous open ports
+      - name: Check for dangerous open ports
         run: |
           echo "Checking for potentially dangerous open ports..."
           echo ""
 
-          # List of ports that should typically be closed
-          DANGEROUS_PORTS="23 21 445 139 3389 5900 5432 3306"
+          # Display all open ports first
+          echo "Open ports detected:"
+          grep -E "^[0-9]+/tcp" nmap-results.txt | awk '{print $1}' | sort || echo "No open ports found"
+          echo ""
 
+          # Define dangerous ports
+          DANGEROUS_PORTS="21 23 25 139 445 3389 5900 5432 3306"
+
+          # Check each port
+          FOUND=0
           for PORT in $DANGEROUS_PORTS; do
-            if grep -q "^$PORT/tcp" nmap-results.txt; then
-              echo "⚠️  WARNING: Port $PORT is OPEN - this should be closed in production"
+            if grep -q "^$PORT/tcp" nmap-results.txt 2>/dev/null; then
+              echo "❌ DANGEROUS: Port $PORT is OPEN - FTP/Telnet/SMB should be closed"
+              FOUND=1
             fi
           done
+
+          if [ $FOUND -eq 0 ]; then
+            echo "✅ No dangerous ports found (ports 21,23,25,139,445,3389,5900,5432,3306 are closed)"
+          fi
 
           echo ""
           echo "Port scan analysis complete."
