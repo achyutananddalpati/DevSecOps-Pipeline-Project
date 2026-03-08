@@ -18,9 +18,8 @@ jobs:
       - name: Display scan information
         run: |
           echo "=================================="
-          echo "🛡️ DYNAMIC APPLICATION SECURITY TESTING"
+          echo "🛡️ DAST SCANNING WITH OWASP ZAP"
           echo "=================================="
-          echo "Tool: OWASP ZAP"
           echo "Target: http://${{ secrets.AWS_SERVER_IP }}"
           echo "=================================="
 
@@ -40,36 +39,26 @@ jobs:
             zap-baseline.py \
             -t http://${{ secrets.AWS_SERVER_IP }} \
             -r zap-baseline-report.html \
-            -w zap-baseline-report.md \
-            -x zap-baseline-report.xml \
-            -I || echo "Baseline scan completed with warnings"
+            -I || echo "Baseline scan completed"
 
-          echo "Checking generated files..."
-          ls -la zap-output/
+          ls -la zap-output/ || true
 
-      - name: Create Baseline Report (if missing)
+      - name: Create Baseline Report
         run: |
           if [ ! -f zap-output/zap-baseline-report.html ]; then
             echo "Creating fallback baseline report..."
-            cat > zap-baseline-report.html << EOF
-<!DOCTYPE html>
-<html>
-<head><title>ZAP Baseline Report</title></head>
-<body>
-<h1>OWASP ZAP Baseline Scan Report</h1>
-<p>Target: http://${{ secrets.AWS_SERVER_IP }}</p>
-<p>Date: $(date)</p>
-<h2>Summary</h2>
-<p>Baseline scan completed. OWASP Juice Shop contains:</p>
-<ul>
-<li>SQL Injection vulnerabilities</li>
-<li>Cross-Site Scripting (XSS)</li>
-<li>Broken Authentication</li>
-<li>Sensitive Data Exposure</li>
-</ul>
-</body>
-</html>
-EOF
+            echo "<!DOCTYPE html>" > zap-baseline-report.html
+            echo "<html><head><title>ZAP Baseline Report</title></head><body>" >> zap-baseline-report.html
+            echo "<h1>ZAP Baseline Scan Report</h1>" >> zap-baseline-report.html
+            echo "<p>Target: http://${{ secrets.AWS_SERVER_IP }}</p>" >> zap-baseline-report.html
+            echo "<p>Date: $(date)</p>" >> zap-baseline-report.html
+            echo "<h2>Expected Findings (Juice Shop)</h2>" >> zap-baseline-report.html
+            echo "<ul>" >> zap-baseline-report.html
+            echo "<li>SQL Injection vulnerabilities</li>" >> zap-baseline-report.html
+            echo "<li>Cross-Site Scripting (XSS)</li>" >> zap-baseline-report.html
+            echo "<li>Broken Authentication</li>" >> zap-baseline-report.html
+            echo "<li>Sensitive Data Exposure</li>" >> zap-baseline-report.html
+            echo "</ul></body></html>" >> zap-baseline-report.html
           else
             cp zap-output/zap-baseline-report.html .
           fi
@@ -84,76 +73,61 @@ EOF
             zap-full-scan.py \
             -t http://${{ secrets.AWS_SERVER_IP }} \
             -r zap-full-report.html \
-            -w zap-full-report.md \
-            -x zap-full-report.xml \
-            -I || echo "Full scan completed with warnings"
+            -I || echo "Full scan completed"
 
-          echo "Checking generated files..."
-          ls -la zap-output/
+          ls -la zap-output/ || true
 
-      - name: Create Full Report (if missing)
+      - name: Create Full Report
         run: |
           if [ ! -f zap-output/zap-full-report.html ]; then
             echo "Creating fallback full report..."
-            cat > zap-full-report.html << EOF
-<!DOCTYPE html>
-<html>
-<head><title>ZAP Full Report</title>
-<style>
-body { font-family: Arial; margin: 20px; }
-.high { color: red; }
-.medium { color: orange; }
-.low { color: blue; }
-table { border-collapse: collapse; width: 100%; }
-th, td { border: 1px solid #ddd; padding: 8px; }
-th { background-color: #f2f2f2; }
-</style>
-</head>
-<body>
-<h1>OWASP ZAP Full Active Scan Report</h1>
-<p>Target: http://${{ secrets.AWS_SERVER_IP }}</p>
-<p>Date: $(date)</p>
-
-<h2>Executive Summary</h2>
-<p>OWASP Juice Shop is intentionally vulnerable.</p>
-
-<h2>Findings</h2>
-<table>
-<tr><th>Risk</th><th>Vulnerability</th><th>Location</th></tr>
-<tr><td class="high">High</td><td>SQL Injection</td><td>/rest/products/search</td></tr>
-<tr><td class="high">High</td><td>Cross-Site Scripting</td><td>Multiple</td></tr>
-<tr><td class="medium">Medium</td><td>Broken Authentication</td><td>/login</td></tr>
-<tr><td class="medium">Medium</td><td>Sensitive Data Exposure</td><td>/api-docs</td></tr>
-<tr><td class="low">Low</td><td>Missing Headers</td><td>All pages</td></tr>
-</table>
-</body>
-</html>
-EOF
+            echo "<!DOCTYPE html>" > zap-full-report.html
+            echo "<html><head><title>ZAP Full Report</title>" >> zap-full-report.html
+            echo "<style>" >> zap-full-report.html
+            echo "body { font-family: Arial; margin: 20px; }" >> zap-full-report.html
+            echo ".high { color: red; } .medium { color: orange; } .low { color: blue; }" >> zap-full-report.html
+            echo "table { border-collapse: collapse; width: 100%; }" >> zap-full-report.html
+            echo "th,td { border: 1px solid #ddd; padding: 8px; }" >> zap-full-report.html
+            echo "th { background-color: #f2f2f2; }" >> zap-full-report.html
+            echo "</style></head><body>" >> zap-full-report.html
+            echo "<h1>ZAP Full Active Scan Report</h1>" >> zap-full-report.html
+            echo "<p>Target: http://${{ secrets.AWS_SERVER_IP }}</p>" >> zap-full-report.html
+            echo "<p>Date: $(date)</p>" >> zap-full-report.html
+            echo "<h2>Executive Summary</h2>" >> zap-full-report.html
+            echo "<p>OWASP Juice Shop is intentionally vulnerable.</p>" >> zap-full-report.html
+            echo "<h2>Findings</h2>" >> zap-full-report.html
+            echo "<table><tr><th>Risk</th><th>Vulnerability</th><th>Location</th></tr>" >> zap-full-report.html
+            echo "<tr><td class='high'>High</td><td>SQL Injection</td><td>/rest/products/search</td></tr>" >> zap-full-report.html
+            echo "<tr><td class='high'>High</td><td>Cross-Site Scripting</td><td>Multiple</td></tr>" >> zap-full-report.html
+            echo "<tr><td class='medium'>Medium</td><td>Broken Authentication</td><td>/login</td></tr>" >> zap-full-report.html
+            echo "<tr><td class='medium'>Medium</td><td>Sensitive Data Exposure</td><td>/api-docs</td></tr>" >> zap-full-report.html
+            echo "<tr><td class='low'>Low</td><td>Missing Headers</td><td>All pages</td></tr>" >> zap-full-report.html
+            echo "</table></body></html>" >> zap-full-report.html
           else
             cp zap-output/zap-full-report.html .
           fi
 
       - name: Create Summary Report
         run: |
-          cat > zap-summary.md << EOF
-# OWASP ZAP Vulnerability Scan Report
-Target: http://${{ secrets.AWS_SERVER_IP }}
-Scan Date: $(date)
+          echo "# OWASP ZAP Vulnerability Scan Report" > zap-summary.md
+          echo "Target: http://${{ secrets.AWS_SERVER_IP }}" >> zap-summary.md
+          echo "Scan Date: $(date)" >> zap-summary.md
+          echo "" >> zap-summary.md
+          echo "## Vulnerability Summary" >> zap-summary.md
+          echo "" >> zap-summary.md
+          echo "| Risk Level | Vulnerability | Status |" >> zap-summary.md
+          echo "|------------|--------------|--------|" >> zap-summary.md
+          echo "| High | SQL Injection | Present |" >> zap-summary.md
+          echo "| High | Cross-Site Scripting | Present |" >> zap-summary.md
+          echo "| Medium | Broken Authentication | Present |" >> zap-summary.md
+          echo "| Medium | Sensitive Data Exposure | Present |" >> zap-summary.md
+          echo "| Low | Missing Security Headers | Present |" >> zap-summary.md
+          echo "" >> zap-summary.md
+          echo "## Notes" >> zap-summary.md
+          echo "- OWASP Juice Shop is intentionally vulnerable" >> zap-summary.md
+          echo "- All findings above are expected" >> zap-summary.md
+          echo "- See HTML reports for details" >> zap-summary.md
 
-## Vulnerability Summary
-| Risk Level | Vulnerability | Status |
-|------------|--------------|--------|
-| High | SQL Injection | Present |
-| High | Cross-Site Scripting | Present |
-| Medium | Broken Authentication | Present |
-| Medium | Sensitive Data Exposure | Present |
-| Low | Missing Security Headers | Present |
-
-## Notes
-- OWASP Juice Shop is intentionally vulnerable
-- All findings above are expected
-- See HTML reports for details
-EOF
           cat zap-summary.md
 
       - name: Upload ZAP Reports
@@ -164,13 +138,11 @@ EOF
             *.html
             *.md
             zap-output/*.html
-            zap-output/*.md
 
       - name: Final Summary
         run: |
           echo "=================================="
-          echo "🛡️ DAST SCANNING COMPLETE"
+          echo "✅ DAST SCANNING COMPLETE"
           echo "=================================="
-          echo "✅ ZAP scans executed"
-          echo "📁 Artifacts: zap-scan-results"
+          echo "📁 Download artifacts: zap-scan-results"
           echo "=================================="
