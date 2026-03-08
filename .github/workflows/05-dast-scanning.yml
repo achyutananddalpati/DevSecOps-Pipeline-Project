@@ -1,59 +1,93 @@
-name: 05 - DAST Scanning with OWASP ZAP (Docker)
+name: 05 - DAST Scanning with OWASP ZAP
 
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0'
 
 jobs:
   zap-scan:
     runs-on: ubuntu-latest
+    name: Scan OWASP Juice Shop
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Display scan information
+      - name: Display Target Information
         run: |
           echo "=================================="
-          echo "🛡️ DAST SCANNING WITH OWASP ZAP"
+          echo "🛡️ OWASP ZAP DAST SCAN"
           echo "=================================="
           echo "Target: http://${{ secrets.AWS_SERVER_IP }}"
+          echo "Application: OWASP Juice Shop"
           echo "=================================="
 
-      - name: Run ZAP Full Scan (Docker)
+      - name: ZAP Baseline Scan
+        id: baseline
+        uses: zaproxy/action-baseline@v0.12.0
+        with:
+          target: 'http://${{ secrets.AWS_SERVER_IP }}'
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a -j'
+
+      - name: ZAP Full Scan
+        id: fullscan
+        uses: zaproxy/action-full-scan@v0.11.0
+        with:
+          target: 'http://${{ secrets.AWS_SERVER_IP }}'
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a -j'
+
+      - name: Create Summary Report
         run: |
-          echo "Starting ZAP full scan using Docker..."
-          echo "This will take 5-10 minutes..."
+          echo "# OWASP ZAP DAST Scan Results" > zap-summary.md
+          echo "" >> zap-summary.md
+          echo "## Scan Information" >> zap-summary.md
+          echo "- **Target:** http://${{ secrets.AWS_SERVER_IP }}" >> zap-summary.md
+          echo "- **Date:** $(date)" >> zap-summary.md
+          echo "- **Application:** OWASP Juice Shop" >> zap-summary.md
+          echo "" >> zap-summary.md
 
-          # Run ZAP full scan using official Docker image
-          docker run --rm \
-            -v $(pwd):/zap/wrk/:rw \
-            -t ghcr.io/zaproxy/zaproxy:stable \
-            zap-full-scan.py \
-            -t http://${{ secrets.AWS_SERVER_IP }} \
-            -r zap-report.html \
-            -x zap-report.xml \
-            -I || true
+          echo "## Vulnerability Summary" >> zap-summary.md
+          echo "" >> zap-summary.md
+          echo "OWASP Juice Shop is intentionally vulnerable. Expected findings include:" >> zap-summary.md
+          echo "" >> zap-summary.md
+          echo "| Risk Level | Vulnerability Type |" >> zap-summary.md
+          echo "|------------|-------------------|" >> zap-summary.md
+          echo "| 🔴 **High** | SQL Injection (SQLi) |" >> zap-summary.md
+          echo "| 🔴 **High** | Cross-Site Scripting (XSS) |" >> zap-summary.md
+          echo "| 🔴 **High** | Broken Access Control |" >> zap-summary.md
+          echo "| 🟡 **Medium** | Broken Authentication |" >> zap-summary.md
+          echo "| 🟡 **Medium** | Sensitive Data Exposure |" >> zap-summary.md
+          echo "| 🟡 **Medium** | Security Misconfiguration |" >> zap-summary.md
+          echo "| 🟢 **Low** | Missing Security Headers |" >> zap-summary.md
+          echo "| 🟢 **Low** | Information Disclosure |" >> zap-summary.md
+          echo "" >> zap-summary.md
 
-          echo "Scan completed"
+          echo "## Next Steps" >> zap-summary.md
+          echo "" >> zap-summary.md
+          echo "1. Review the full ZAP report in artifacts" >> zap-summary.md
+          echo "2. Document findings for your project report" >> zap-summary.md
+          echo "3. These vulnerabilities will be addressed in Chapter 6 (Remediation)" >> zap-summary.md
 
-      - name: Check for report
-        run: |
-          if [ -f zap-report.html ]; then
-            echo "✅ Report generated: zap-report.html"
-            echo "Report size: $(wc -l < zap-report.html) lines"
-          else
-            echo "⚠️ No report generated, creating summary"
-            echo "<html><body><h1>ZAP Scan</h1>" > zap-report.html
-            echo "<p>Target: http://${{ secrets.AWS_SERVER_IP }}</p>" >> zap-report.html
-            echo "<p>Date: $(date)</p>" >> zap-report.html
-            echo "<p>OWASP Juice Shop is intentionally vulnerable.</p>" >> zap-report.html
-            echo "</body></html>" >> zap-report.html
-          fi
+          cat zap-summary.md
 
-      - name: Upload Results
+      - name: Upload ZAP Reports
         uses: actions/upload-artifact@v4
         with:
           name: zap-scan-results
-          path: zap-report.html
+          path: |
+            zap-summary.md
+            zap-out/**
+
+      - name: Final Status
+        run: |
+          echo "=================================="
+          echo "✅ ZAP SCAN COMPLETED SUCCESSFULLY"
+          echo "=================================="
+          echo "📁 Artifacts: zap-scan-results"
+          echo "📊 Download and review the reports"
+          echo "=================================="
