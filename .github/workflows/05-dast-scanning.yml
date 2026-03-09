@@ -1,4 +1,4 @@
-#name: 05 - DAST Scanning with OWASP ZAP
+name: 05 - DAST Scanning with OWASP ZAP
 
 on:
   push:
