@@ -25,6 +25,7 @@ jobs:
           echo "=================================="
           echo "Tool: SonarQube (SonarCloud)"
           echo "Repository: ${{ github.repository }}"
+          echo "Branch: ${{ github.ref_name }}"
           echo "=================================="
 
       - name: Setup Node.js (for dependency analysis)
@@ -47,8 +48,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
-          # FIX 1: Removed manual branch naming so PRs don't break
-          # FIX 2: Added exclusions so SonarQube doesn't scan 10,000 node_module library files
           args: >
             -Dsonar.organization=${{ github.repository_owner }}
             -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}
@@ -61,6 +60,7 @@ jobs:
           echo "" >> sonar-summary.md
           echo "## Scan Information" >> sonar-summary.md
           echo "- **Repository:** ${{ github.repository }}" >> sonar-summary.md
+          echo "- **Branch:** ${{ github.ref_name }}" >> sonar-summary.md
           echo "- **Date:** $(date)" >> sonar-summary.md
           echo "- **Tool:** SonarCloud (SonarQube)" >> sonar-summary.md
           echo "" >> sonar-summary.md
