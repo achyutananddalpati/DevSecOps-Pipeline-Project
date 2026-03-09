@@ -37,6 +37,7 @@ jobs:
           target: 'http://${{ secrets.AWS_SERVER_IP }}'
           # Removed the missing rules.tsv file line
           cmd_options: '-a -j -I'
+          artifact_name: 'zap-full-scan-report' # Added this line to explicitly name the artifact
 
       - name: Create Summary Report
         run: |
