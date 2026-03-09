@@ -1,0 +1,102 @@
+name: 06 - SAST Scanning with SonarQube
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  sonarqube-scan:
+    runs-on: ubuntu-latest
+    name: Scan Source Code for Vulnerabilities
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for better analysis
+
+      - name: Display Scan Information
+        run: |
+          echo "=================================="
+          echo "🔍 STATIC APPLICATION SECURITY TESTING"
+          echo "=================================="
+          echo "Tool: SonarQube"
+          echo "Repository: ${{ github.repository }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "=================================="
+
+      - name: Setup Node.js (for dependency analysis)
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies (if any)
+        run: |
+          if [ -f package.json ]; then
+            echo "package.json found - installing dependencies"
+            npm install || true
+          else
+            echo "No package.json found - skipping dependency installation"
+          fi
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarcloud-github-action@v2.3.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.organization=${{ github.repository_owner }}
+            -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}
+            -Dsonar.sources=.
+            -Dsonar.host.url=https://sonarcloud.io
+            -Dsonar.branch.name=${{ github.ref_name }}
+
+      - name: Generate Summary Report
+        run: |
+          echo "# SonarQube SAST Scan Results" > sonar-summary.md
+          echo "" >> sonar-summary.md
+          echo "## Scan Information" >> sonar-summary.md
+          echo "- **Repository:** ${{ github.repository }}" >> sonar-summary.md
+          echo "- **Branch:** ${{ github.ref_name }}" >> sonar-summary.md
+          echo "- **Date:** $(date)" >> sonar-summary.md
+          echo "- **Tool:** SonarCloud (SonarQube)" >> sonar-summary.md
+          echo "" >> sonar-summary.md
+          
+          echo "## What SAST Checks For" >> sonar-summary.md
+          echo "" >> sonar-summary.md
+          echo "| Category | Examples |" >> sonar-summary.md
+          echo "|----------|----------|" >> sonar-summary.md
+          echo "| 🔴 **Security Vulnerabilities** | SQL Injection, XSS, Path Traversal |" >> sonar-summary.md
+          echo "| 🟡 **Code Smells** | Maintainability issues, duplicate code |" >> sonar-summary.md
+          echo "| 🟢 **Bugs** | Null pointers, resource leaks |" >> sonar-summary.md
+          echo "| 🔵 **Coverage** | Test coverage gaps |" >> sonar-summary.md
+          echo "| 🟣 **Duplications** | Repeated code blocks |" >> sonar-summary.md
+          echo "" >> sonar-summary.md
+          
+          echo "## Next Steps" >> sonar-summary.md
+          echo "" >> sonar-summary.md
+          echo "1. View detailed results on [SonarCloud](https://sonarcloud.io/dashboard?id=${{ github.repository_owner }}_${{ github.event.repository.name }})" >> sonar-summary.md
+          echo "2. Review Security Hotspots and Code Smells" >> sonar-summary.md
+          echo "3. Fix critical issues before deployment" >> sonar-summary.md
+          echo "4. These findings will be addressed in Chapter 6 (Remediation)" >> sonar-summary.md
+          
+          cat sonar-summary.md
+
+      - name: Upload Summary Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonarqube-results
+          path: sonar-summary.md
+
+      - name: Final Status
+        run: |
+          echo "=================================="
+          echo "✅ SONARQUBE SCAN COMPLETED"
+          echo "=================================="
+          echo "📁 Artifact: sonarqube-results"
+          echo "🌐 View full report: https://sonarcloud.io/dashboard?id=${{ github.repository_owner }}_${{ github.event.repository.name }}"
+          echo "=================================="
