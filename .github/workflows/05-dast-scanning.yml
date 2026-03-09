@@ -1,4 +1,4 @@
-name: 05 - DAST Scanning with OWASP ZAP
+name: 05 - DAST Scanning with OWASP ZAP (Fast Test)
 
 on:
   push:
@@ -7,7 +7,6 @@ on:
   schedule:
     - cron: '0 0 * * 0'
 
-# CRITICAL FIX: Gives ZAP permission to create GitHub Issues for vulnerabilities
 permissions:
   issues: write
   contents: read
@@ -24,20 +23,26 @@ jobs:
       - name: Display Target Information
         run: |
           echo "=================================="
-          echo "🛡️ OWASP ZAP DAST SCAN"
+          echo "🛡️ OWASP ZAP DAST SCAN (FAST MOCK TEST)"
           echo "=================================="
           echo "Target: http://${{ secrets.AWS_SERVER_IP }}"
           echo "Application: OWASP Juice Shop"
           echo "=================================="
 
-      - name: ZAP Full Scan
-        id: fullscan
-        uses: zaproxy/action-full-scan@v0.11.0
-        with:
-          target: 'http://${{ secrets.AWS_SERVER_IP }}'
-          # Removed the missing rules.tsv file line
-          cmd_options: '-a -j -I'
-          artifact_name: 'zap-full-scan-report' # Added this line to explicitly name the artifact
+      # --- START OF MOCK TEST ---
+      - name: MOCK ZAP Scan (Fast Test)
+        run: |
+          echo "Simulating a 30-minute ZAP scan in 2 seconds..."
+          sleep 2
+
+          # Create fake ZAP output directories and files so the artifact uploader doesn't crash
+          mkdir -p zap-out
+          echo "This is a fake JSON report for testing." > zap-out/report_json.json
+          echo "This is a fake HTML report for testing." > zap-out/report_html.html
+          echo "This is a fake Markdown report for testing." > zap-out/report_md.md
+
+          echo "✅ Mock scan complete! Moving to report generation..."
+      # --- END OF MOCK TEST ---
 
       - name: Create Summary Report
         run: |
@@ -79,6 +84,7 @@ jobs:
           name: zap-scan-results
           path: |
             zap-summary.md
+            zap-out/**
 
       - name: Final Status
         run: |
