@@ -1,81 +1,88 @@
-name: 05 - DAST Scanning with OWASP ZAP
+name: 05 - Automated Vulnerability Scanning (OWASP ZAP)
 
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
-  schedule:
-    - cron: '0 0 * * 0'
 
 jobs:
   zap-scan:
     runs-on: ubuntu-latest
-    name: Scan OWASP Juice Shop
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Display Target Information
+      - name: Display scan target
         run: |
           echo "=================================="
-          echo "🛡️ OWASP ZAP DAST SCAN"
+          echo "🕷️ DYNAMIC VULNERABILITY SCAN (DAST)"
           echo "=================================="
+          echo "Tool: OWASP ZAP (Zed Attack Proxy)"
           echo "Target: http://${{ secrets.AWS_SERVER_IP }}"
-          echo "Application: OWASP Juice Shop"
           echo "=================================="
 
-      - name: Run ZAP Full Scan with Docker
+      - name: Run OWASP ZAP Baseline Scan
         run: |
-          echo "Starting ZAP full scan using Docker..."
-          echo "This will take 5-10 minutes..."
+          echo "Pulling OWASP ZAP Docker image and initiating scan..."
+          echo "This will spider the target and perform passive scanning."
+          echo "This process may take 3-5 minutes..."
 
-          # Create output directory
-          mkdir -p zap-output
+          # We use docker run to execute the ZAP baseline script
+          # -t: target URL
+          # -J: output results as JSON
+          # || true prevents the pipeline from failing if ZAP finds vulnerabilities (which it will on Juice Shop!)
 
-          # Run ZAP full scan using Docker directly (no GitHub action wrapper)
-          docker run --rm \
-            -v $(pwd)/zap-output:/zap/wrk/:rw \
-            -t ghcr.io/zaproxy/zaproxy:stable \
-            zap-full-scan.py \
+          docker run -v $(pwd):/zap/wrk/:rw -t ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
             -t http://${{ secrets.AWS_SERVER_IP }} \
-            -r zap-report.html \
-            -w zap-report.md \
-            -x zap-report.xml \
-            -I \
-            -a \
-            -j \
-            || echo "Scan completed with warnings (this is normal)"
+            -J zap-results.json || true
 
-          echo "Scan completed. Checking for reports..."
-          ls -la zap-output/
+          echo "✅ ZAP Scan completed. Results saved to zap-results.json"
 
-      - name: Display Scan Summary
+      - name: Parse Results and Generate Markdown Report
         run: |
           echo "=================================="
-          echo "📊 SCAN SUMMARY"
+          echo "📊 GENERATING VULNERABILITY REPORT"
           echo "=================================="
 
-          if [ -f zap-output/zap-report.md ]; then
-            echo "Scan completed successfully. Findings:"
-            grep -E "^WARN-NEW|^FAIL-NEW" zap-output/zap-report.md || echo "No warnings found in report"
-          else
-            echo "Report not found, but scan likely ran successfully."
-            echo "Check artifacts for results."
-          fi
+          echo "# 🛡️ OWASP ZAP Vulnerability Report" > zap-summary.md
+          echo "Target: http://${{ secrets.AWS_SERVER_IP }}" >> zap-summary.md
+          echo "Generated: $(date)" >> zap-summary.md
+          echo "" >> zap-summary.md
 
-      - name: Upload ZAP Reports
+          # Extract the total number of alerts based on risk level
+          HIGH=$(jq '[.site[].alerts[] | select(.riskcode == "3")] | length' zap-results.json 2>/dev/null || echo "0")
+          MEDIUM=$(jq '[.site[].alerts[] | select(.riskcode == "2")] | length' zap-results.json 2>/dev/null || echo "0")
+          LOW=$(jq '[.site[].alerts[] | select(.riskcode == "1")] | length' zap-results.json 2>/dev/null || echo "0")
+
+          echo "## Executive Summary" >> zap-summary.md
+          echo "- **🔴 High Risk:** $HIGH" >> zap-summary.md
+          echo "- **🟡 Medium Risk:** $MEDIUM" >> zap-summary.md
+          echo "- **🔵 Low Risk:** $LOW" >> zap-summary.md
+          echo "" >> zap-summary.md
+
+          echo "## Detailed Findings" >> zap-summary.md
+          echo "| Risk Level | Vulnerability Name | Instances |" >> zap-summary.md
+          echo "|------------|--------------------|-----------|" >> zap-summary.md
+
+          # Parse the JSON array and format it into a Markdown table
+          jq -r '.site[].alerts[] | "| \(.riskdesc | split(" ") | .[0]) | \(.name) | \(.count) |"' zap-results.json >> zap-summary.md || echo "| N/A | Parsing Error or No Alerts | 0 |" >> zap-summary.md
+
+          cat zap-summary.md
+
+      - name: Upload Vulnerability Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: zap-scan-results
+          name: zap-vulnerability-results
           path: |
-            zap-output/*
+            zap-results.json
+            zap-summary.md
 
-      - name: Final Status
+      - name: Final Pipeline Status
         run: |
           echo "=================================="
-          echo "✅ ZAP SCAN COMPLETED"
+          echo "🕷️ VULNERABILITY SCANNING COMPLETE"
           echo "=================================="
-          echo "📁 Download artifacts: zap-scan-results"
-          echo "📊 Open zap-output/zap-report.html in browser"
+          echo "Artifacts are ready for download."
+          echo "Review the zap-summary.md for the extracted vulnerabilities."
           echo "=================================="
