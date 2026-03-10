@@ -52,7 +52,7 @@ jobs:
             -Dsonar.organization=${{ github.repository_owner }}
             -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}
             -Dsonar.sources=.
-            -Dsonar.exclusions=**/node_modules/**,**/tests/**,**/frontend/node_modules/**
+        # Exclusions are now in sonar-project.properties which we are going to make in futere if needed
 
       - name: Generate Summary Report
         run: |
