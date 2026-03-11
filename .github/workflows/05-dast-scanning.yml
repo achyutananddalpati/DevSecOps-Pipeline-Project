@@ -75,7 +75,7 @@ jobs:
           cat zap-summary.md
 
       - name: Upload ZAP Reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: zap-scan-results
           path: |
