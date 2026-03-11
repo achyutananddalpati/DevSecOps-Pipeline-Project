@@ -31,8 +31,9 @@ updates:
       prefix: "pip"
     labels:
       - "dependencies"
-      - "python"
+      - "github-actions"
       - "security"
+      - "python"
     ignore:
       - dependency-name: "pip"
       - dependency-name: "setuptools"
