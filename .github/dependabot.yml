@@ -1,24 +1,5 @@
 version: 2
 updates:
-  # npm ecosystem - Scans OWASP Juice Shop's package.json
-  - package-ecosystem: "npm"
-    directory: "/"
-    schedule:
-      interval: "daily"
-      time: "09:00"
-      timezone: "UTC"
-    open-pull-requests-limit: 10
-    allow:
-      - dependency-type: "all"
-    commit-message:
-      prefix: "npm"
-      include: "scope"
-    labels:
-      - "dependencies"
-      - "npm"
-      - "security"
-      - "juice-shop"
-
   # GitHub Actions ecosystem - Scans workflow dependencies
   - package-ecosystem: "github-actions"
     directory: "/"
