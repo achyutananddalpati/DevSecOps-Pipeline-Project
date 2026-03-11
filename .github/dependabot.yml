@@ -1,0 +1,57 @@
+version: 2
+updates:
+  # npm ecosystem - Scans OWASP Juice Shop's package.json
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "daily"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 10
+    allow:
+      - dependency-type: "all"
+    commit-message:
+      prefix: "npm"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "npm"
+      - "security"
+      - "juice-shop"
+
+  # GitHub Actions ecosystem - Scans workflow dependencies
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "06:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "actions"
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "security"
+
+  # pip ecosystem - Scans Python dependencies for exploit scripts
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "06:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    allow:
+      - dependency-type: "all"
+    commit-message:
+      prefix: "pip"
+    labels:
+      - "dependencies"
+      - "python"
+      - "security"
+    ignore:
+      - dependency-name: "pip"
+      - dependency-name: "setuptools"
