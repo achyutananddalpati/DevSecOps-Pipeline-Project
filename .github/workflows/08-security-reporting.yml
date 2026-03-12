@@ -27,14 +27,22 @@ jobs:
           echo "📦 Installing Python dependencies..."
           pip install requests beautifulsoup4
           echo "✅ Dependencies installed"
-
       # Step 4: Download All Scan Artifacts
       - name: Download All Scan Artifacts
         uses: actions/download-artifact@v4
         with:
           path: ./scan-results/
-          pattern: "*-results"  # <-- QUOTED to fix YAML syntax
+          pattern: "*-results"
           merge-multiple: true
+
+      # Step 4.5: Debug - Show what was downloaded
+      - name: Debug Downloaded Files
+        run: |
+          echo "📁 Contents of scan-results directory:"
+          ls -la ./scan-results/ || echo "Directory empty or doesn't exist"
+          echo ""
+          echo "📁 Finding all JSON files:"
+          find ./scan-results -name "*.json" | sort || echo "No JSON files found"
 
       # Step 5: List Downloaded Files
       - name: List Downloaded Files
