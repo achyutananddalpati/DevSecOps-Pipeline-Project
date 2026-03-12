@@ -9,19 +9,17 @@ jobs:
   generate-report:
     runs-on: ubuntu-latest
     name: Generate Unified Security Report
-    
+
     steps:
       # Step 1: Checkout Repository
       - name: Checkout Repository
         uses: actions/checkout@v3
-        # uses: and run: cannot be combined - this step only uses 'uses:'
 
       # Step 2: Setup Python
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-        # This step only uses 'uses:' with parameters
 
       # Step 3: Install Dependencies
       - name: Install Dependencies
@@ -29,16 +27,14 @@ jobs:
           echo "📦 Installing Python dependencies..."
           pip install requests beautifulsoup4
           echo "✅ Dependencies installed"
-        # This step only uses 'run:' for shell commands
 
       # Step 4: Download All Scan Artifacts
       - name: Download All Scan Artifacts
         uses: actions/download-artifact@v4
         with:
           path: ./scan-results/
-          pattern: *-results
+          pattern: "*-results"  # <-- QUOTED to fix YAML syntax
           merge-multiple: true
-        # This step only uses 'uses:' with parameters
 
       # Step 5: List Downloaded Files
       - name: List Downloaded Files
@@ -46,7 +42,6 @@ jobs:
           echo "📁 Downloaded files:"
           find ./scan-results -type f | sort
           echo "✅ File listing complete"
-        # This step only uses 'run:'
 
       # Step 6: Run Report Generator
       - name: Run Report Generator
@@ -56,7 +51,6 @@ jobs:
           python3 generate_security_report.py
           cp security-report-*.json ../../
           echo "✅ Report generated"
-        # This step only uses 'run:'
 
       # Step 7: Upload Security Report
       - name: Upload Security Report
@@ -64,7 +58,6 @@ jobs:
         with:
           name: security-report
           path: security-report-*.json
-        # This step only uses 'uses:'
 
       # Step 8: Display Report Summary
       - name: Display Report Summary
@@ -73,7 +66,6 @@ jobs:
           echo "------------------"
           cat security-report-*.json | python3 -m json.tool | grep -E "critical|high|medium|total|pipeline_status" || echo "No summary found"
           echo "------------------"
-        # This step only uses 'run:'
 
       # Step 9: Check for Critical Findings
       - name: Check for Critical Findings
@@ -81,10 +73,10 @@ jobs:
           REPORT_FILE=$(ls security-report-*.json | head -1)
           CRITICAL=$(jq '.summary.critical' $REPORT_FILE)
           HIGH=$(jq '.summary.high' $REPORT_FILE)
-          
+
           echo "Critical findings: $CRITICAL"
           echo "High findings: $HIGH"
-          
+
           if [ "$CRITICAL" -gt 0 ]; then
             echo "❌ CRITICAL VULNERABILITIES FOUND!"
             echo "Pipeline would fail here in production"
@@ -92,7 +84,6 @@ jobs:
           else
             echo "✅ No critical vulnerabilities"
           fi
-        # This step only uses 'run:'
 
       # Step 10: Final Status
       - name: Final Status
@@ -103,4 +94,3 @@ jobs:
           echo "📁 Artifact: security-report"
           echo "📊 Check the 'Check for Critical Findings' step for results"
           echo "=================================="
-        # This step only uses 'run:'
