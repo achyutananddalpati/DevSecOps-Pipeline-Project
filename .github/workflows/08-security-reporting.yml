@@ -67,6 +67,7 @@ jobs:
           python3 scripts/parsers/generate_security_report.py
 
       - name: Upload Security Report
+        id: upload-report
         uses: actions/upload-artifact@v4
         with:
           name: final-security-report
@@ -139,7 +140,7 @@ jobs:
                     {
                       "type": "button",
                       "text": { "type": "plain_text", "text": "📊 View Security Report" },
-                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts"
+                      "url": "${{ steps.upload-report.outputs.artifact-url }}"
                     }
                   ]
                 },
