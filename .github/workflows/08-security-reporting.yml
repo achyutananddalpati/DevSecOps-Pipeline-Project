@@ -84,3 +84,73 @@ jobs:
           else
             echo "✅ Quality Gate Passed. No High vulnerabilities found."        #PASSED
           fi
+
+
+
+
+
+      - name: Send Slack Alert on Pipeline Failure
+        if: failure()
+        uses: slackapi/slack-github-action@v2.0.0
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": "🚨 *DevSecOps Pipeline Alert* 🚨",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "🔴 Pipeline Failure: Critical Vulnerabilities Detected"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*Repository:*\n${{ github.repository }}" },
+                    { "type": "mrkdwn", "text": "*Workflow:*\n${{ github.workflow }}" }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*Run ID:*\n${{ github.run_id }}" },
+                    { "type": "mrkdwn", "text": "*Branch:*\n${{ github.ref_name }}" }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*High Vulnerabilities:*\n${{ steps.quality-gate.outputs.HIGH }}" },
+                    { "type": "mrkdwn", "text": "*Medium Vulnerabilities:*\n${{ steps.quality-gate.outputs.MEDIUM }}" }
+                  ]
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": { "type": "plain_text", "text": "🔍 View Workflow Run" },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    },
+                    {
+                      "type": "button",
+                      "text": { "type": "plain_text", "text": "📊 View Security Report" },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts"
+                    }
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "⚠️ Pipeline halted due to security policy violation. Immediate action required."
+                    }
+                  ]
+                }
+              ]
+            }
