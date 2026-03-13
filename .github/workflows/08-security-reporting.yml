@@ -79,8 +79,8 @@ jobs:
 
           if [ "$STATUS" = "FAILED" ]; then
             echo "❌ CRITICAL/HIGH VULNERABILITIES DETECTED."
-            echo "🛑 BREAKING THE PIPELINE. DEPLOYMENT HALTED."
+            echo "🛑 BREAKING THE PIPELINE. DEPLOYMENT HALTED."                  #FAILED
             exit 1
           else
-            echo "✅ Quality Gate Passed. No High vulnerabilities found."
+            echo "✅ Quality Gate Passed. No High vulnerabilities found."        #PASSED
           fi
