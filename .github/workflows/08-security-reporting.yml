@@ -3,7 +3,7 @@ name: 08 - Security Reporting & Results Parsing
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 8 * * *'  # Daily at 8 AM
+    - cron: '0 8 * * *'
 
 jobs:
   generate-report:
@@ -11,23 +11,14 @@ jobs:
     name: Generate Unified Security Report
 
     steps:
-      # Step 1: Checkout Repository
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      # Step 2: Setup Python
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      # Step 3: Install Dependencies
-      - name: Install Dependencies
-        run: |
-          echo "📦 Installing Python dependencies..."
-          pip install requests beautifulsoup4
-          echo "✅ Dependencies installed"
-      # Step 4: Download All Scan Artifacts
       - name: Download All Scan Artifacts
         uses: actions/download-artifact@v4
         with:
@@ -35,70 +26,33 @@ jobs:
           pattern: "*-results"
           merge-multiple: true
 
-      # Step 4.5: Debug - Show what was downloaded
-      - name: Debug Downloaded Files
+      - name: Verify Downloaded Artifacts
         run: |
-          echo "📁 Contents of scan-results directory:"
-          ls -la ./scan-results/ || echo "Directory empty or doesn't exist"
-          echo ""
-          echo "📁 Finding all JSON files:"
-          find ./scan-results -name "*.json" | sort || echo "No JSON files found"
+          echo "📁 Checking scan-results directory:"
+          ls -la ./scan-results/ || echo "Directory empty or missing"
 
-      # Step 5: List Downloaded Files
-      - name: List Downloaded Files
-        run: |
-          echo "📁 Downloaded files:"
-          find ./scan-results -type f | sort
-          echo "✅ File listing complete"
-
-      # Step 6: Run Report Generator
       - name: Run Report Generator
         run: |
-          echo "🔍 Running security report generator..."
-          cd scripts/parsers
-          python3 generate_security_report.py
-          cp security-report-*.json ../../
-          echo "✅ Report generated"
+          # Add parsers directory to Python path so imports work
+          export PYTHONPATH="${PYTHONPATH}:${GITHUB_WORKSPACE}/scripts/parsers"
+          # Run the script from the repository root
+          python3 scripts/parsers/generate_security_report.py
 
-      # Step 7: Upload Security Report
       - name: Upload Security Report
         uses: actions/upload-artifact@v4
         with:
-          name: security-report
+          name: final-security-report
           path: security-report-*.json
 
-      # Step 8: Display Report Summary
-      - name: Display Report Summary
-        run: |
-          echo "📊 Report Summary:"
-          echo "------------------"
-          cat security-report-*.json | python3 -m json.tool | grep -E "critical|high|medium|total|pipeline_status" || echo "No summary found"
-          echo "------------------"
-
-      # Step 9: Check for Critical Findings
-      - name: Check for Critical Findings
+      - name: Enforce Security Quality Gate (Pipeline Breaking)
         run: |
           REPORT_FILE=$(ls security-report-*.json | head -1)
-          CRITICAL=$(jq '.summary.critical' $REPORT_FILE)
-          HIGH=$(jq '.summary.high' $REPORT_FILE)
+          STATUS=$(grep -o '"pipeline_status": "[^"]*' $REPORT_FILE | grep -o '[^"]*$')
 
-          echo "Critical findings: $CRITICAL"
-          echo "High findings: $HIGH"
-
-          if [ "$CRITICAL" -gt 0 ]; then
-            echo "❌ CRITICAL VULNERABILITIES FOUND!"
-            echo "Pipeline would fail here in production"
-            # exit 1  # Uncomment to actually fail the workflow
+          if [ "$STATUS" = "FAILED" ]; then
+            echo "❌ CRITICAL/HIGH VULNERABILITIES DETECTED."
+            echo "🛑 BREAKING THE PIPELINE. DEPLOYMENT HALTED."
+            exit 1
           else
-            echo "✅ No critical vulnerabilities"
+            echo "✅ Quality Gate Passed. No High vulnerabilities found."
           fi
-
-      # Step 10: Final Status
-      - name: Final Status
-        run: |
-          echo "=================================="
-          echo "✅ SECURITY REPORT GENERATED"
-          echo "=================================="
-          echo "📁 Artifact: security-report"
-          echo "📊 Check the 'Check for Critical Findings' step for results"
-          echo "=================================="
