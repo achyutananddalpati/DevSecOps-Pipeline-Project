@@ -1,8 +1,40 @@
-- name: Generate Vulnerability Artifacts (To Trigger Pipeline Break)
+name: 08 - Security Reporting & Results Parsing
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 8 * * *'
+
+jobs:
+  generate-report:
+    runs-on: ubuntu-latest
+    name: Generate Unified Security Report
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Download All Scan Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./scan-results/
+          pattern: "*-results"
+          merge-multiple: true
+
+      - name: Verify Downloaded Artifacts
+        run: |
+          echo "📁 Checking scan-results directory:"
+          ls -la ./scan-results/ || echo "Directory empty or missing"
+
+      - name: Generate Vulnerability Artifacts (To Trigger Pipeline Break)
         run: |
           mkdir -p ./scan-results
 
-          # Simulate a failed ZAP scan with 2 High Vulnerabilities
           cat << 'EOF' > ./scan-results/zap_report.json
           {
             "site": [
@@ -17,7 +49,6 @@
           }
           EOF
 
-          # Simulate an Nmap scan with open ports
           cat << 'EOF' > ./scan-results/nmap_report.xml
           <?xml version="1.0" encoding="UTF-8"?>
           <nmaprun>
@@ -29,3 +60,27 @@
             </host>
           </nmaprun>
           EOF
+
+      - name: Run Report Generator
+        run: |
+          export PYTHONPATH="${PYTHONPATH}:${GITHUB_WORKSPACE}/scripts/parsers"
+          python3 scripts/parsers/generate_security_report.py
+
+      - name: Upload Security Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: final-security-report
+          path: security-report-*.json
+
+      - name: Enforce Security Quality Gate (Pipeline Breaking)
+        run: |
+          REPORT_FILE=$(ls security-report-*.json | head -1)
+          STATUS=$(grep -o '"pipeline_status": "[^"]*' $REPORT_FILE | grep -o '[^"]*$')
+
+          if [ "$STATUS" = "FAILED" ]; then
+            echo "❌ CRITICAL/HIGH VULNERABILITIES DETECTED."
+            echo "🛑 BREAKING THE PIPELINE. DEPLOYMENT HALTED."
+            exit 1
+          else
+            echo "✅ Quality Gate Passed. No High vulnerabilities found."
+          fi
