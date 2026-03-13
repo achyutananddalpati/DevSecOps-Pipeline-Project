@@ -109,15 +109,12 @@ This project modernizes traditional penetration testing by transitioning manual 
 
 ### Planned Tasks:
 
-#### a. Results Parsing
-- Ingest JSON output from Nmap scans
-- Parse ZAP scan results
-- Generate unified security report
-
-#### b. Breaking the Build
-- Configure pipeline to fail on critical vulnerabilities
-- Halt deployment automatically
-- Enforce security gates
+#### a. Ingesting Scan Results & Pipeline Failure
+- Ingest JSON/XML output from Nmap and ZAP scans
+- Parse scan results into a unified security report with risk categorization
+- Automatically fail the pipeline (exit code 1) when high/critical vulnerabilities found
+- Halt deployment process to enforce security quality gates
+- Generate downloadable artifact with complete findings
 
 #### c. Real-Time Alerting
 - Set up webhooks for notifications
