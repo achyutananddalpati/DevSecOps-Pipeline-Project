@@ -119,7 +119,6 @@ This project modernizes traditional penetration testing by transitioning manual 
 #### c. Real-Time Alerting
 - Set up webhooks for notifications
 - Integrate Slack channel alerts
-- Email notification configuration
 - Immediate failure reporting
 
 ---
