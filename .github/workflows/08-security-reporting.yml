@@ -134,12 +134,12 @@ jobs:
                   "elements": [
                     {
                       "type": "button",
-                      "text": { "type": "plain_text", "text": "🔍 View Workflow Run" },
+                      "text": { "type": "plain_text", "text": "🔍 View Workflow Run on GitHub" },
                       "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
                     },
                     {
                       "type": "button",
-                      "text": { "type": "plain_text", "text": "📊 View Security Report" },
+                      "text": { "type": "plain_text", "text": "📊 Download & View Security Report" },
                       "url": "${{ steps.upload-report.outputs.artifact-url }}"
                     }
                   ]
