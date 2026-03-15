@@ -26,18 +26,18 @@ jobs:
           echo "=================================="
           echo "🛡️ OWASP ZAP DAST SCAN"
           echo "=================================="
-          echo "Target: http://${{ secrets.AWS_SERVER_IP }}"
+          echo "Target: https://${{ secrets.AWS_SERVER_IP }}"
           echo "Application: OWASP Juice Shop"
           echo "=================================="
 
       - name: ZAP Full Scan
         id: fullscan
-        # VERIFIED FIX: v0.13.0 fully supports GitHub's new v4 Artifact backend
         uses: zaproxy/action-full-scan@v0.13.0
         with:
-          target: 'http://${{ secrets.AWS_SERVER_IP }}'
-          cmd_options: '-a -j -I'
-          # VERIFIED FIX: Explicitly naming the artifact prevents GitHub backend rejection
+          target: 'https://${{ secrets.AWS_SERVER_IP }}'
+          # Added -k flag to ignore SSL certificate errors (self-signed cert)
+          # Added -T 60 to increase timeout for SSL handshake
+          cmd_options: '-a -j -I -k -T 60'
           artifact_name: 'zap-full-scan-report'
 
       - name: Create Summary Report
@@ -45,7 +45,7 @@ jobs:
           echo "# OWASP ZAP DAST Scan Results" > zap-summary.md
           echo "" >> zap-summary.md
           echo "## Scan Information" >> zap-summary.md
-          echo "- **Target:** http://${{ secrets.AWS_SERVER_IP }}" >> zap-summary.md
+          echo "- **Target:** https://${{ secrets.AWS_SERVER_IP }}" >> zap-summary.md
           echo "- **Date:** $(date)" >> zap-summary.md
           echo "- **Application:** OWASP Juice Shop" >> zap-summary.md
           echo "" >> zap-summary.md

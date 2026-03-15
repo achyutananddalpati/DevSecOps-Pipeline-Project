@@ -11,7 +11,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Display server information
         run: |
@@ -22,58 +22,48 @@ jobs:
           echo "Target Domain: ${{ secrets.AWS_SERVER_DOMAIN }}"
           echo "=================================="
 
-      - name: 🔴 CRITICAL - Server Reachability Test (Port 80)
+      - name: 🔴 CRITICAL - Server Reachability Test (Port 443)
         run: |
-          echo "Checking if server is online using port 80..."
-          echo "Attempting to connect to http://${{ secrets.AWS_SERVER_IP }}:80"
+          echo "Checking if server is online using port 443..."
+          echo "Attempting to connect to https://${{ secrets.AWS_SERVER_IP }}:443"
           echo ""
 
-          # Use curl with timeout to check if port 80 responds
-          # -s: silent, -o /dev/null: discard output, -w: write HTTP code, --connect-timeout: max time to connect
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 http://${{ secrets.AWS_SERVER_IP }} || echo "FAILED")
+          # Added -k for self-signed certificates and ensured HTTPS_CODE is consistent
+          HTTPS_CODE=$(curl -s -k -o /dev/null -w "%{https_code}" --connect-timeout 5 https://${{ secrets.AWS_SERVER_IP }} || echo "FAILED")
 
-          echo "HTTP Response Code: $HTTP_CODE"
+          echo "HTTPS Response Code: $HTTPS_CODE"
           echo ""
 
-          # CRITICAL FIX: 000 or FAILED means connection failed - server is DOWN
-          if [ "$HTTP_CODE" = "200" ]; then
-            echo "✅✅ SERVER IS ONLINE - Juice Shop is running (HTTP 200 OK)"
+          if [ "$HTTPS_CODE" = "200" ]; then
+            echo "✅✅ SERVER IS ONLINE - Juice Shop is running (HTTPS 200 OK)"
             echo "server_status=online" >> $GITHUB_ENV
             exit 0
-          elif [ "$HTTP_CODE" = "302" ] || [ "$HTTP_CODE" = "301" ]; then
-            echo "✅✅ SERVER IS ONLINE - Juice Shop responded with redirect (HTTP $HTTP_CODE)"
+          elif [ "$HTTPS_CODE" = "302" ] || [ "$HTTPS_CODE" = "301" ]; then
+            echo "✅✅ SERVER IS ONLINE - Juice Shop responded with redirect (HTTPS $HTTPS_CODE)"
             echo "server_status=online" >> $GITHUB_ENV
             exit 0
-          elif [ "$HTTP_CODE" = "403" ] || [ "$HTTP_CODE" = "401" ]; then
-            echo "⚠️ SERVER IS ONLINE but requires authentication (HTTP $HTTP_CODE)"
+          elif [ "$HTTPS_CODE" = "403" ] || [ "$HTTPS_CODE" = "401" ]; then
+            echo "⚠️ SERVER IS ONLINE but requires authentication (HTTPS $HTTPS_CODE)"
             echo "server_status=online-auth" >> $GITHUB_ENV
             exit 0
-          elif [ "$HTTP_CODE" = "404" ]; then
-            echo "⚠️ SERVER IS ONLINE but page not found (HTTP 404)"
+          elif [ "$HTTPS_CODE" = "404" ]; then
+            echo "⚠️ SERVER IS ONLINE but page not found (HTTPS 404)"
             echo "server_status=online-404" >> $GITHUB_ENV
             exit 0
-          elif [ "$HTTP_CODE" = "000" ] || [ "$HTTP_CODE" = "FAILED" ] || [ "$HTTP_CODE" = "" ]; then
+          elif [ "$HTTPS_CODE" = "000" ] || [ "$HTTPS_CODE" = "FAILED" ] || [ "$HTTPS_CODE" = "" ]; then
             echo "❌❌ SERVER IS DOWN OR NOT REACHABLE"
             echo ""
-            echo "🔴 CRITICAL: No response on port 80"
+            echo "🔴 CRITICAL: No response on port 443"
             echo ""
             echo "This could mean:"
             echo "  1. EC2 instance is STOPPED"
             echo "  2. Juice Shop container is not running"
-            echo "  3. Security Group blocks port 80 from GitHub"
+            echo "  3. Security Group blocks port 443 from GitHub"
             echo "  4. AWS server has no internet route"
             echo ""
-            echo "Troubleshooting commands:"
-            echo "  - SSH to server: ./connect-to-server.sh"
-            echo "  - Check instance state: (AWS Console → EC2)"
-            echo "  - Check Docker: docker ps"
-            echo "  - Start Juice Shop: docker start juice-shop"
-            echo "  - Check Security Group: Port 80 should allow 0.0.0.0/0"
-            echo ""
-            exit 1  # ❌ THIS FAILS THE PIPELINE
+            exit 1
           else
-            echo "⚠️ Server responded with unexpected code: $HTTP_CODE"
-            echo "Server is online but returned HTTP $HTTP_CODE"
+            echo "⚠️ Server responded with unexpected code: $HTTPS_CODE"
             echo "server_status=online-unknown" >> $GITHUB_ENV
             exit 0
           fi
@@ -84,8 +74,8 @@ jobs:
           echo "Checking if Juice Shop homepage loads properly..."
           echo ""
 
-          # Download the homepage and check for keywords
-          curl -s --connect-timeout 5 http://${{ secrets.AWS_SERVER_IP }} > homepage.html
+          # Added -k here to allow self-signed certificate content to be downloaded
+          curl -s -k --connect-timeout 5 https://${{ secrets.AWS_SERVER_IP }} > homepage.html
 
           if grep -q "Juice Shop" homepage.html || grep -q "OWASP" homepage.html || grep -q "juice" homepage.html; then
             echo "✅ Juice Shop homepage verified - found expected keywords"
@@ -100,9 +90,6 @@ jobs:
             head -10 homepage.html
             echo "----------------------------------------"
             rm homepage.html
-            echo ""
-            echo "This might be OK if Juice Shop homepage changed,"
-            echo "or something else is running on port 80."
             exit 0
           fi
 
@@ -112,11 +99,8 @@ jobs:
           echo "=================================="
           echo "✅✅✅ ALL CHECKS PASSED ✅✅✅"
           echo "=================================="
-          echo "✓ Server is online and responding on port 80"
+          echo "✓ Server is online and responding on port 443"
           echo "✓ Juice Shop is accessible"
-          echo "✓ Pipeline ready for security scanning"
-          echo "=================================="
-          echo "Next: Chapter 2 - Automated Information Gathering"
           echo "=================================="
 
       - name: ❌ Final Status Report (Failure)
@@ -125,13 +109,4 @@ jobs:
           echo "=================================="
           echo "❌❌❌ PIPELINE FAILED ❌❌❌"
           echo "=================================="
-          echo "The server is DOWN or not reachable."
-          echo ""
-          echo "Quick fix steps:"
-          echo "1. Go to AWS Console → EC2"
-          echo "2. Check if instance is 'Running'"
-          echo "3. If stopped: right-click → Instance State → Start"
-          echo "4. Wait 2 minutes for boot"
-          echo "5. SSH and run: docker start juice-shop"
-          echo "6. Re-run this workflow"
-          echo "=================================="
+          echo "Check your AWS EC2 status and Nginx SSL configuration."
