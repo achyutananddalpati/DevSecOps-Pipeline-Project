@@ -51,9 +51,9 @@ jobs:
         uses: zaproxy/action-full-scan@v0.13.0
         with:
           target: 'https://${{ secrets.AWS_SERVER_IP }}'
-          # Added -k flag to ignore SSL certificate errors (self-signed cert)
-          # Added -T 60 to increase timeout for SSL handshake
-          cmd_options: '-a -j -I -k -T 60'
+          # REMOVED: -k flag is not supported by zap-full-scan.py
+          # ADDED: -T 60 to increase timeout for SSL handshake
+          cmd_options: '-a -j -I -T 60'
           artifact_name: 'zap-full-scan-report'
 
       - name: Create Summary Report
