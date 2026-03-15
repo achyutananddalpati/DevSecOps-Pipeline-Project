@@ -92,7 +92,7 @@ jobs:
 
       - name: Send Slack Alert on Pipeline Failure
         if: failure()
-        uses: slackapi/slack-github-action@v2.0.0
+        uses: slackapi/slack-github-action@v3.0.1
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:
