@@ -10,8 +10,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # =============================================
+      # CHECKOUT REPOSITORY
+      # =============================================
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      # =============================================
+      # DYNAMIC SECURITY GROUP OPENING (EPHEMERAL)
+      # =============================================
+      - name: Temporarily Open HTTPS Port in Security Group
+        uses: mnavarrocarter/authorize-aws-security-group-ingress-action@v1.0.0
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          aws-security-group-id: ${{ secrets.AWS_SECURITY_GROUP_ID }}
+          protocol: 'tcp'
+          port: 443
 
       - name: Display server information
         run: |
@@ -28,8 +44,7 @@ jobs:
           echo "Attempting to connect to https://${{ secrets.AWS_SERVER_IP }}:443"
           echo ""
 
-          # Added -k for self-signed certificates and ensured HTTPS_CODE is consistent
-          HTTPS_CODE=$(curl -s -k -o /dev/null -w "%{https_code}" --connect-timeout 5 https://${{ secrets.AWS_SERVER_IP }} || echo "FAILED")
+          HTTPS_CODE=$(curl -s -k -o /dev/null -w "%{http_code}" --connect-timeout 5 https://${{ secrets.AWS_SERVER_IP }} || echo "FAILED")
 
           echo "HTTPS Response Code: $HTTPS_CODE"
           echo ""
@@ -74,7 +89,6 @@ jobs:
           echo "Checking if Juice Shop homepage loads properly..."
           echo ""
 
-          # Added -k here to allow self-signed certificate content to be downloaded
           curl -s -k --connect-timeout 5 https://${{ secrets.AWS_SERVER_IP }} > homepage.html
 
           if grep -q "Juice Shop" homepage.html || grep -q "OWASP" homepage.html || grep -q "juice" homepage.html; then
