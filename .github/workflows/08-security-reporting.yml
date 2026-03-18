@@ -31,36 +31,6 @@ jobs:
           echo "📁 Checking scan-results directory:"
           ls -la ./scan-results/ || echo "Directory empty or missing"
 
-      - name: Generate Vulnerability Artifacts (To Trigger Pipeline Break)
-        run: |
-          mkdir -p ./scan-results
-
-          cat << 'EOF' > ./scan-results/zap_report.json
-          {
-            "site": [
-              {
-                "alerts": [
-                  { "riskcode": "3", "name": "SQL Injection" },
-                  { "riskcode": "3", "name": "Cross Site Scripting (XSS)" },
-                  { "riskcode": "2", "name": "Information Disclosure" }
-                ]
-              }
-            ]
-          }
-          EOF
-
-          cat << 'EOF' > ./scan-results/nmap_report.xml
-          <?xml version="1.0" encoding="UTF-8"?>
-          <nmaprun>
-            <host>
-              <ports>
-                <port portid="22"><state state="open"/><service name="ssh"/></port>
-                <port portid="80"><state state="open"/><service name="http"/></port>
-              </ports>
-            </host>
-          </nmaprun>
-          EOF
-
       - name: Run Report Generator
         run: |
           export PYTHONPATH="${PYTHONPATH}:${GITHUB_WORKSPACE}/scripts/parsers"
@@ -80,15 +50,11 @@ jobs:
 
           if [ "$STATUS" = "FAILED" ]; then
             echo "❌ CRITICAL/HIGH VULNERABILITIES DETECTED."
-            echo "🛑 BREAKING THE PIPELINE. DEPLOYMENT HALTED."                  #FAILED
+            echo "🛑 BREAKING THE PIPELINE. DEPLOYMENT HALTED."
             exit 1
           else
-            echo "✅ Quality Gate Passed. No High vulnerabilities found."        #PASSED
+            echo "✅ Quality Gate Passed. No High vulnerabilities found."
           fi
-
-
-
-
 
       - name: Send Slack Alert on Pipeline Failure
         if: failure()
@@ -150,6 +116,43 @@ jobs:
                     {
                       "type": "mrkdwn",
                       "text": "⚠️ Pipeline halted due to security policy violation. Immediate action required."
+                    }
+                  ]
+                }
+              ]
+            }
+
+      - name: Send Slack Alert on Pipeline Success
+        if: success()
+        uses: slackapi/slack-github-action@v3.0.1
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": "✅ *DevSecOps Pipeline Alert*",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "✅ Pipeline Passed: Secure Deployment Successful"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*Repository:*\n${{ github.repository }}" },
+                    { "type": "mrkdwn", "text": "*Workflow:*\n${{ github.workflow }}" }
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "🔒 Quality Gate Passed Authentically. WAF Virtual Patching actively blocking threats. Application deployed securely to AWS EC2."
                     }
                   ]
                 }
