@@ -14,13 +14,13 @@ jobs:
       # CHECKOUT REPOSITORY
       # =============================================
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # =============================================
       # DYNAMIC SECURITY GROUP OPENING (EPHEMERAL)
       # =============================================
       - name: Temporarily Open HTTPS Port in Security Group
-        uses: mnavarrocarter/authorize-aws-security-group-ingress-action@v1.0.0
+        uses: mnavarrocarter/authorize-aws-security-group-ingress-action@v1.1.0
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
