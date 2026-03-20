@@ -10,9 +10,38 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # =============================================
+      # CHECKOUT REPOSITORY (Updated to v4)
+      # =============================================
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
+      # =============================================
+      # DYNAMIC SECURITY GROUP OPENING (EPHEMERAL)
+      # =============================================
+      - name: Temporarily Open HTTPS Port (443) in Security Group
+        uses: mnavarrocarter/authorize-aws-security-group-ingress-action@v1.1.0
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          aws-security-group-id: ${{ secrets.AWS_SECURITY_GROUP_ID }}
+          protocol: 'tcp'
+          port: 443
+
+      - name: Temporarily Open HTTP Port (80) in Security Group
+        uses: mnavarrocarter/authorize-aws-security-group-ingress-action@v1.1.0
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          aws-security-group-id: ${{ secrets.AWS_SECURITY_GROUP_ID }}
+          protocol: 'tcp'
+          port: 80
+
+      # =============================================
+      # SERVICE IDENTIFICATION EXECUTION
+      # =============================================
       - name: Display scan target
         run: |
           echo "=================================="
@@ -37,13 +66,9 @@ jobs:
           echo "Scan may take 2-3 minutes..."
           echo ""
 
-          # Service detection without OS scan (OS scan requires root)
-          # -sV: Version detection
-          # -sC: Default scripts
-          # --version-intensity 9: Maximum version detection effort
-
+          # Added -Pn to skip pinging
           echo "Scanning with aggressive service detection..."
-          nmap -sV -sC --version-intensity 9 ${{ secrets.AWS_SERVER_IP }} > nmap-service-scan.txt
+          nmap -Pn -sV -sC --version-intensity 9 ${{ secrets.AWS_SERVER_IP }} > nmap-service-scan.txt
 
           echo ""
           echo "=== DETAILED SERVICE DETECTION RESULTS ==="
@@ -241,8 +266,11 @@ jobs:
 
           echo "Service inventory report generated: service-inventory.md"
 
+      # =============================================
+      # UPLOAD ARTIFACT (Updated to v4)
+      # =============================================
       - name: Upload All Scan Results
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: service-identification-results
           path: |
