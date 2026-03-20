@@ -29,16 +29,6 @@ jobs:
           protocol: 'tcp'
           port: 443
 
-      - name: Temporarily Open HTTP Port (80) in Security Group
-        uses: mnavarrocarter/authorize-aws-security-group-ingress-action@v1.1.0
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-          aws-security-group-id: ${{ secrets.AWS_SECURITY_GROUP_ID }}
-          protocol: 'tcp'
-          port: 80
-
       # =============================================
       # SERVICE IDENTIFICATION EXECUTION
       # =============================================
