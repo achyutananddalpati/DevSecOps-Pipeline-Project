@@ -11,19 +11,25 @@ jobs:
     name: Generate Unified Security Report
 
     steps:
+      # =============================================
+      # CHECKOUT & SETUP (Updated to stable versions)
+      # =============================================
       - name: Checkout Repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
+      # =============================================
+      # DOWNLOAD ARTIFACTS
+      # Removed the strict "*-results" pattern so it downloads everything
+      # =============================================
       - name: Download All Scan Artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v4
         with:
           path: ./scan-results/
-          pattern: "*-results"
           merge-multiple: true
 
       - name: Verify Downloaded Artifacts
@@ -31,6 +37,31 @@ jobs:
           echo "📁 Checking scan-results directory:"
           ls -la ./scan-results/ || echo "Directory empty or missing"
 
+      # =============================================
+      # NEW STEP: RENAME THE ZAP REPORT ON THE FLY
+      # =============================================
+      - name: Prepare ZAP Report for Parsing
+        run: |
+          echo "Looking for ZAP's default report_json.json..."
+
+          # Find the file in case it was placed in a nested folder by Workflow 5
+          ZAP_FILE=$(find ./scan-results/ -name "report_json.json" | head -n 1)
+
+          if [ -n "$ZAP_FILE" ]; then
+            echo "Found ZAP report at: $ZAP_FILE"
+            # Copy and rename it to what the Python script is hardcoded to look for
+            cp "$ZAP_FILE" ./scan-results/zap-results.json
+            echo "✅ Copied to zap-results.json so the Python script can read it!"
+          else
+            echo "⚠️ report_json.json not found in artifacts."
+          fi
+
+          echo "Updated scan-results directory:"
+          ls -la ./scan-results/
+
+      # =============================================
+      # REPORT GENERATION & ENFORCEMENT
+      # =============================================
       - name: Run Report Generator
         run: |
           export PYTHONPATH="${PYTHONPATH}:${GITHUB_WORKSPACE}/scripts/parsers"
@@ -38,7 +69,7 @@ jobs:
 
       - name: Upload Security Report
         id: upload-report
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: final-security-report
           path: security-report-*.json
