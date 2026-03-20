@@ -11,25 +11,16 @@ jobs:
     name: Generate Unified Security Report
 
     steps:
-      # =============================================
-      # CHECKOUT REPOSITORY (Updated to v4)
-      # =============================================
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      # =============================================
-      # SETUP PYTHON (Updated to v5)
-      # =============================================
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.10'
 
-      # =============================================
-      # DOWNLOAD ARTIFACTS (Updated to v4)
-      # =============================================
       - name: Download All Scan Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: ./scan-results/
           pattern: "*-results"
@@ -45,12 +36,9 @@ jobs:
           export PYTHONPATH="${PYTHONPATH}:${GITHUB_WORKSPACE}/scripts/parsers"
           python3 scripts/parsers/generate_security_report.py
 
-      # =============================================
-      # UPLOAD ARTIFACT (Updated to v4)
-      # =============================================
       - name: Upload Security Report
         id: upload-report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: final-security-report
           path: security-report-*.json
