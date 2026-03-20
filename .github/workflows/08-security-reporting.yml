@@ -19,32 +19,27 @@ jobs:
         with:
           python-version: '3.10'
 
-      # =============================================
-      # 1. BULLETPROOF THE DIRECTORY
-      # Ensures the folder exists so the script never crashes
-      # =============================================
       - name: Create Results Directory
         run: |
           mkdir -p ./scan-results/
           echo "✅ Directory ./scan-results/ created safely."
 
       # =============================================
-      # 2. CROSS-WORKFLOW ARTIFACT DOWNLOADER
-      # Reaches into Workflow 5 to grab the completed ZAP scan
+      # TARGETING THE CORRECT ARTIFACT NAME
       # =============================================
       - name: Download ZAP Artifacts (Cross-Workflow)
         uses: dawidd6/action-download-artifact@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          # IMPORTANT: Make sure this matches the actual file name of your Workflow 5 in the .github/workflows/ folder!
           workflow: 05-dast-scanning.yml
-          name: zap-scan-results
+          name: zap-full-scan-report # <--- FIXED: Now pointing to where ZAP actually puts the JSON!
           path: ./scan-results/
-          # 'completed' ensures it downloads even if ZAP found a High vuln and 'failed' its run
-          workflow_conclusion: completed
-        continue-on-error: true
+          search_artifacts: true
+          workflow_conclusion: ""
 
       # =============================================
-      # 3. RENAME THE REPORT
+      # RENAME THE REPORT
       # =============================================
       - name: Prepare ZAP Report for Parsing
         run: |
@@ -64,9 +59,6 @@ jobs:
           echo "Current scan-results directory contents:"
           ls -la ./scan-results/
 
-      # =============================================
-      # 4. REPORT GENERATION & ENFORCEMENT
-      # =============================================
       - name: Run Report Generator
         run: |
           export PYTHONPATH="${PYTHONPATH}:${GITHUB_WORKSPACE}/scripts/parsers"
@@ -92,7 +84,6 @@ jobs:
             echo "✅ Quality Gate Passed. No High vulnerabilities found."
           fi
 
-      # (Slack Alerts intentionally kept identical to your configuration)
       - name: Send Slack Alert on Pipeline Failure
         if: failure()
         uses: slackapi/slack-github-action@v3.0.1
@@ -110,6 +101,51 @@ jobs:
                     "type": "plain_text",
                     "text": "🔴 Pipeline Failure: Critical Vulnerabilities Detected"
                   }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*Repository:*\n${{ github.repository }}" },
+                    { "type": "mrkdwn", "text": "*Workflow:*\n${{ github.workflow }}" }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*Run ID:*\n${{ github.run_id }}" },
+                    { "type": "mrkdwn", "text": "*Branch:*\n${{ github.ref_name }}" }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*High Vulnerabilities:*\n${{ steps.quality-gate.outputs.HIGH }}" },
+                    { "type": "mrkdwn", "text": "*Medium Vulnerabilities:*\n${{ steps.quality-gate.outputs.MEDIUM }}" }
+                  ]
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": { "type": "plain_text", "text": "🔍 View Workflow Run on GitHub" },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    },
+                    {
+                      "type": "button",
+                      "text": { "type": "plain_text", "text": "📊 Download & View Security Report" },
+                      "url": "${{ steps.upload-report.outputs.artifact-url }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "⚠️ Pipeline halted due to security policy violation. Immediate action required."
+                    }
+                  ]
                 }
               ]
             }
@@ -131,6 +167,22 @@ jobs:
                     "type": "plain_text",
                     "text": "✅ Pipeline Passed: Secure Deployment Successful"
                   }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*Repository:*\n${{ github.repository }}" },
+                    { "type": "mrkdwn", "text": "*Workflow:*\n${{ github.workflow }}" }
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "🔒 Quality Gate Passed Authentically. WAF Virtual Patching actively blocking threats. Application deployed securely to AWS EC2."
+                    }
+                  ]
                 }
               ]
             }
