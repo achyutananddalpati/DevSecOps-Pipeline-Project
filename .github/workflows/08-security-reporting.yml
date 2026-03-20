@@ -28,7 +28,7 @@ jobs:
       # TARGETING THE CORRECT ARTIFACT NAME
       # =============================================
       - name: Download ZAP Artifacts (Cross-Workflow)
-        uses: dawidd6/action-download-artifact@v3
+        uses: dawidd6/action-download-artifact@v6
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           # IMPORTANT: Make sure this matches the actual file name of your Workflow 5 in the .github/workflows/ folder!
