@@ -1,0 +1,107 @@
+name: 05 - DAST Scanning with OWASP ZAP
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0'
+
+# CRITICAL FIX: Gives ZAP permission to create GitHub Issues for vulnerabilities
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  zap-scan:
+    runs-on: ubuntu-latest
+    name: Scan OWASP Juice Shop
+
+    steps:
+      # =============================================
+      # CHECKOUT REPOSITORY
+      # =============================================
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      # =============================================
+      # DYNAMIC SECURITY GROUP OPENING (EPHEMERAL)
+      # =============================================
+      - name: Temporarily Open HTTPS Port in Security Group
+        uses: mnavarrocarter/authorize-aws-security-group-ingress-action@v1.1.0
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          aws-security-group-id: ${{ secrets.AWS_SECURITY_GROUP_ID }}
+          protocol: 'tcp'
+          port: 443
+
+      - name: Display Target Information
+        run: |
+          echo "=================================="
+          echo "🛡️ OWASP ZAP DAST SCAN"
+          echo "=================================="
+          echo "Target: https://${{ secrets.AWS_SERVER_IP }}"
+          echo "Application: OWASP Juice Shop"
+          echo "=================================="
+
+      - name: ZAP Full Scan
+        id: fullscan
+        uses: zaproxy/action-full-scan@v0.13.0
+        with:
+          target: 'https://${{ secrets.AWS_SERVER_IP }}'
+          # REMOVED: -k flag is not supported by zap-full-scan.py
+          # ADDED: -T 60 to increase timeout for SSL handshake
+          cmd_options: '-a -j -I -T 60'
+          artifact_name: 'zap-full-scan-report'
+
+      - name: Create Summary Report
+        run: |
+          echo "# OWASP ZAP DAST Scan Results" > zap-summary.md
+          echo "" >> zap-summary.md
+          echo "## Scan Information" >> zap-summary.md
+          echo "- **Target:** https://${{ secrets.AWS_SERVER_IP }}" >> zap-summary.md
+          echo "- **Date:** $(date)" >> zap-summary.md
+          echo "- **Application:** OWASP Juice Shop" >> zap-summary.md
+          echo "" >> zap-summary.md
+
+          echo "## Vulnerability Summary" >> zap-summary.md
+          echo "" >> zap-summary.md
+          echo "OWASP Juice Shop is intentionally vulnerable. Expected findings include:" >> zap-summary.md
+          echo "" >> zap-summary.md
+          echo "| Risk Level | Vulnerability Type |" >> zap-summary.md
+          echo "|------------|-------------------|" >> zap-summary.md
+          echo "| 🔴 **High** | SQL Injection (SQLi) |" >> zap-summary.md
+          echo "| 🔴 **High** | Cross-Site Scripting (XSS) |" >> zap-summary.md
+          echo "| 🔴 **High** | Broken Access Control |" >> zap-summary.md
+          echo "| 🟡 **Medium** | Broken Authentication |" >> zap-summary.md
+          echo "| 🟡 **Medium** | Sensitive Data Exposure |" >> zap-summary.md
+          echo "| 🟡 **Medium** | Security Misconfiguration |" >> zap-summary.md
+          echo "| 🟢 **Low** | Missing Security Headers |" >> zap-summary.md
+          echo "| 🟢 **Low** | Information Disclosure |" >> zap-summary.md
+          echo "" >> zap-summary.md
+
+          echo "## Next Steps" >> zap-summary.md
+          echo "" >> zap-summary.md
+          echo "1. Review the full ZAP report in artifacts" >> zap-summary.md
+          echo "2. Check the GitHub Issues tab for automatically created vulnerability tickets!" >> zap-summary.md
+          echo "3. These vulnerabilities will be addressed in Chapter 6 (Remediation)" >> zap-summary.md
+
+          cat zap-summary.md
+
+      - name: Upload ZAP Reports
+        uses: actions/upload-artifact@v7
+        with:
+          name: zap-scan-results
+          path: |
+            zap-summary.md
+
+      - name: Final Status
+        run: |
+          echo "=================================="
+          echo "✅ ZAP SCAN COMPLETED SUCCESSFULLY"
+          echo "=================================="
+          echo "📁 Artifacts: zap-scan-results and zap-full-scan-report"
+          echo "📊 Download and review the reports"
+          echo "=================================="

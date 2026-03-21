@@ -17,7 +17,7 @@ jobs:
       # CHECKOUT REPOSITORY (Updated to v4)
       # =============================================
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0  # Shallow clones must be disabled for SonarQube to analyze Git history
 
@@ -35,7 +35,7 @@ jobs:
       # SETUP NODE (Updated to v4)
       # =============================================
       - name: Setup Node.js (for dependency analysis)
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '18'
 
@@ -95,7 +95,7 @@ jobs:
       # UPLOAD ARTIFACT (Updated to v4)
       # =============================================
       - name: Upload Summary Report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sonarqube-results
           path: sonar-summary.md
