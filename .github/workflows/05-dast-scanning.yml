@@ -22,7 +22,7 @@ jobs:
       # CHECKOUT REPOSITORY (Updated to v4)
       # =============================================
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # =============================================
       # DYNAMIC SECURITY GROUP OPENING (EPHEMERAL)
