@@ -19,10 +19,10 @@ jobs:
 
     steps:
       # =============================================
-      # CHECKOUT REPOSITORY
+      # CHECKOUT REPOSITORY (Updated to v4)
       # =============================================
       - name: Checkout Repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       # =============================================
       # DYNAMIC SECURITY GROUP OPENING (EPHEMERAL)
@@ -46,15 +46,22 @@ jobs:
           echo "Application: OWASP Juice Shop"
           echo "=================================="
 
+      # =============================================
+      # ZAP FULL SCAN WITH FALSE POSITIVE EXCLUSION
+      # =============================================
       - name: ZAP Full Scan
         id: fullscan
         uses: zaproxy/action-full-scan@v0.13.0
         with:
           target: 'https://${{ secrets.AWS_SERVER_IP }}'
-          # REMOVED: -k flag is not supported by zap-full-scan.py
-          # ADDED: -T 60 to increase timeout for SSL handshake
-          cmd_options: '-a -j -I -T 60'
           artifact_name: 'zap-full-scan-report'
+          # ADDED: -z flag configures ZAP to globally ignore the socket.io endpoint
+          # This prevents the Time-Based SQLi false positive from triggering
+          cmd_options: >
+            -a -j -I -T 60
+            -z "-config globalexcludeurl.url_list.url(0).regex='.*socket\.io.*'
+            -config globalexcludeurl.url_list.url(0).description='Exclude_SocketIO'
+            -config globalexcludeurl.url_list.url(0).enabled=true"
 
       - name: Create Summary Report
         run: |
@@ -90,8 +97,11 @@ jobs:
 
           cat zap-summary.md
 
+      # =============================================
+      # UPLOAD ARTIFACT (Updated to v4)
+      # =============================================
       - name: Upload ZAP Reports
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: zap-scan-results
           path: |
