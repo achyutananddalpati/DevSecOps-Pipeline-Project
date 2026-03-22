@@ -110,16 +110,15 @@ This project modernizes traditional penetration testing by transitioning manual 
 ### Planned Tasks:
 
 #### a. Ingesting Scan Results & Pipeline Failure
-- Ingest JSON/XML output from Nmap and ZAP scans
-- Parse scan results into a unified security report with risk categorization
-- Automatically fail the pipeline (exit code 1) when high/critical vulnerabilities found
-- Halt deployment process to enforce security quality gates
-- Generate downloadable artifact with complete findings
+- Custom Python parsers for Nmap and ZAP outputs
+- Unified security report with risk categorization
+- Quality gate enforces "Zero Critical/High" policy
+- Pipeline automatically fails on critical vulnerabilities
 
-#### c. Real-Time Alerting
-- Set up webhooks for notifications
-- Integrate Slack channel alerts
-- Immediate failure reporting
+#### b. Real-Time Alerting
+- Slack webhook integrated for pipeline notifications
+- Rich Block Kit messages with interactive buttons in slack
+- Both failure and success alerts implemented
 
 ---
 
@@ -127,25 +126,24 @@ This project modernizes traditional penetration testing by transitioning manual 
 
 ### Planned Tasks:
 
-#### a. Manual Code Remediation
-- Patch vulnerable code locally
-- Fix issues identified by DAST/SAST
-- Implement security fixes
+#### a. AWS Security Hardening with Dynamic Rule (Ephemeral Access)
+- Ephemeral security group rules implemented
+- SSH access restricted to single IP only
+- HTTPS port 443 opens temporarily during workflow execution
+- HTTP traffic redirected to HTTPS via Nginx reverse proxy
 
-#### b. Automated Dependency Updates
-- Allow Dependabot to create Pull Requests
-- Update vulnerable libraries automatically
-- Merge secure versions
+#### b. Manual Code Remediation
+- Workflows updated to use HTTPS with self-signed certificate handling
+- Exploit scripts updated with SSL bypass and warning suppression
+- Web Application Firewall (WAF) rules deployed to block SQLi/XSS
+- Security headers (X-Frame-Options, CSP, HSTS) added
+- Reporting workflow refined for authentic scan data
 
-#### c. Pipeline Validation
-- Push fixed code to trigger pipeline
-- Re-run all security scans
-- Verify vulnerability fixes
-
-#### d. Secure Deployment
-- Pass all security checks
-- Deploy hardened application to AWS
-- Final validation complete
+#### c. Final Pipeline Validation & Secure Deployment
+- Complete pipeline re-executed to validate remediation
+- Zero critical and high vulnerabilities confirmed
+- GitHub issues closed with audit trail comments
+- Slack success notification confirming secure deployment
 
 ---
 
@@ -167,6 +165,6 @@ This project modernizes traditional penetration testing by transitioning manual 
 | **DAST Scanner** | OWASP ZAP |
 | **SAST Scanner** | SonarQube |
 | **SCA Tool** | GitHub Dependabot |
-| **Alerting** | Slack/Email Webhooks |
+| **Alerting** | Slack Webhooks |
 
 ---
